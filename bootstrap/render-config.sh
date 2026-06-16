@@ -95,6 +95,66 @@ matrix_stream_mode() {
   printf '%s' "${MATRIX_STREAM_MODE:-off}"
 }
 
+validate_provider_segment() {
+  name=$1
+  value=$2
+  case "$value" in
+    ''|*[!A-Za-z0-9_-]*)
+      printf 'Invalid %s "%s"; use only letters, numbers, underscores, or hyphens.\n' "$name" "$value" >&2
+      exit 1
+      ;;
+  esac
+}
+
+validate_unsigned_int() {
+  name=$1
+  value=$2
+  case "$value" in
+    ''|*[!0-9]*)
+      printf 'Invalid %s "%s"; use a whole number.\n' "$name" "$value" >&2
+      exit 1
+      ;;
+  esac
+}
+
+MODEL_PROVIDER_FAMILY=$(first_nonempty "${MODEL_PROVIDER_FAMILY:-}" "deepseek")
+MODEL_PROVIDER_ALIAS=$(first_nonempty "${MODEL_PROVIDER_ALIAS:-}" "text")
+MODEL_PROVIDER_MODEL=$(first_nonempty "${MODEL_PROVIDER_MODEL:-}" "${DEEPSEEK_MODEL:-}" "deepseek-chat")
+MODEL_PROVIDER_BASE_URL=$(first_nonempty "${MODEL_PROVIDER_BASE_URL:-}" "${DEEPSEEK_BASE_URL:-}")
+MODEL_PROVIDER_API_KEY=$(first_nonempty "${MODEL_PROVIDER_API_KEY:-}" "${ZEROCLAW_providers__models__deepseek__text__api_key:-}" "${DEEPSEEK_API_KEY:-}")
+MODEL_PROVIDER_WIRE_API=$(first_nonempty "${MODEL_PROVIDER_WIRE_API:-}" "${DEEPSEEK_WIRE_API:-}")
+MODEL_PROVIDER_TIMEOUT_SECS=$(first_nonempty "${MODEL_PROVIDER_TIMEOUT_SECS:-}" "120")
+MODEL_PROVIDER_KIND=$(first_nonempty "${MODEL_PROVIDER_KIND:-}" "")
+MODEL_PROVIDER_REF="${MODEL_PROVIDER_FAMILY}.${MODEL_PROVIDER_ALIAS}"
+SHELL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TIMEOUT_SECS:-}" "300")
+SHELL_TOOL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TOOL_TIMEOUT_SECS:-}" "$SHELL_TIMEOUT_SECS")
+
+validate_provider_segment "MODEL_PROVIDER_FAMILY" "$MODEL_PROVIDER_FAMILY"
+validate_provider_segment "MODEL_PROVIDER_ALIAS" "$MODEL_PROVIDER_ALIAS"
+validate_unsigned_int "MODEL_PROVIDER_TIMEOUT_SECS" "$MODEL_PROVIDER_TIMEOUT_SECS"
+validate_unsigned_int "SHELL_TIMEOUT_SECS" "$SHELL_TIMEOUT_SECS"
+validate_unsigned_int "SHELL_TOOL_TIMEOUT_SECS" "$SHELL_TOOL_TIMEOUT_SECS"
+
+write_model_provider_block() {
+  cat <<EOF
+[providers.models.${MODEL_PROVIDER_FAMILY}.${MODEL_PROVIDER_ALIAS}]
+model = "$(toml_escape "$MODEL_PROVIDER_MODEL")"
+EOF
+  if [ -n "$MODEL_PROVIDER_BASE_URL" ]; then
+    printf 'uri = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_BASE_URL")"
+  fi
+  if [ -n "$MODEL_PROVIDER_API_KEY" ]; then
+    printf 'api_key = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_API_KEY")"
+  fi
+  if [ -n "$MODEL_PROVIDER_WIRE_API" ]; then
+    printf 'wire_api = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_WIRE_API")"
+  fi
+  if [ -n "$MODEL_PROVIDER_KIND" ]; then
+    printf 'kind = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_KIND")"
+  fi
+  printf 'timeout_secs = %s\n' "$MODEL_PROVIDER_TIMEOUT_SECS"
+}
+
 write_mcp_block() {
   if [ "$(toml_bool "${MCP_ENABLED:-false}")" != "true" ] || [ -z "${MCP_URL:-}" ]; then
     return
@@ -120,8 +180,8 @@ cat > "$CONFIG_PATH" <<EOF
 schema_version = 3
 workspace_dir = "$(toml_escape "$WORKSPACE_DIR")"
 config_path = "$(toml_escape "$CONFIG_PATH")"
-default_model_provider = "deepseek.text"
-default_model = "$(toml_escape "${DEEPSEEK_MODEL:-deepseek-chat}")"
+default_model_provider = "$(toml_escape "$MODEL_PROVIDER_REF")"
+default_model = "$(toml_escape "$MODEL_PROVIDER_MODEL")"
 default_temperature = 0.7
 
 [heartbeat]
@@ -152,12 +212,11 @@ loop_detection_enabled = $(toml_bool "${PACING_LOOP_DETECTION_ENABLED:-true}")
 loop_detection_window_size = ${PACING_LOOP_DETECTION_WINDOW_SIZE:-20}
 loop_detection_max_repeats = ${PACING_LOOP_DETECTION_MAX_REPEATS:-3}
 
-[providers.models.deepseek.text]
-uri = "$(toml_escape "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}")"
-model = "$(toml_escape "${DEEPSEEK_MODEL:-deepseek-chat}")"
-api_key = "$(toml_escape "${ZEROCLAW_providers__models__deepseek__text__api_key:-}")"
-wire_api = "$(toml_escape "${DEEPSEEK_WIRE_API:-chat_completions}")"
-timeout_secs = 120
+EOF
+
+write_model_provider_block >> "$CONFIG_PATH"
+
+cat >> "$CONFIG_PATH" <<EOF
 
 [providers.models.custom.vision]
 uri = "$(toml_escape "${VISION_BASE_URL:-https://api.openai.com/v1}")"
@@ -215,7 +274,7 @@ recovery_key = "$(toml_escape "$(first_nonempty "${MATRIX_RECOVERY_KEY:-}" "${MA
 
 [agents.main]
 enabled = true
-model_provider = "deepseek.text"
+model_provider = "$(toml_escape "$MODEL_PROVIDER_REF")"
 risk_profile = "root"
 runtime_profile = "daemon"
 channels = ["matrix.home"]
@@ -253,7 +312,7 @@ agentic = true
 max_tool_iterations = 50
 max_actions_per_hour = 4294967295
 max_cost_per_day_cents = 1000000
-shell_timeout_secs = 300
+shell_timeout_secs = ${SHELL_TIMEOUT_SECS}
 max_delegation_depth = 3
 delegation_timeout_secs = 300
 agentic_timeout_secs = 900
@@ -270,7 +329,7 @@ kind = "native"
 reasoning_enabled = false
 
 [shell_tool]
-timeout_secs = 300
+timeout_secs = ${SHELL_TOOL_TIMEOUT_SECS}
 EOF
 
 write_mcp_block >> "$CONFIG_PATH"

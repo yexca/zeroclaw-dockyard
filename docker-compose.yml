@@ -1,7 +1,13 @@
-﻿name: zeroclaw-matrix-multi
+name: zeroclaw-matrix-multi
 
 x-zeroclaw-common: &zeroclaw-common
-  image: ${ZEROCLAW_IMAGE:-zeroclaw:0.8.0-beta2-matrix}
+  image: ${ZEROCLAW_IMAGE:-zeroclaw:0.8.0-beta2-matrix-tools}
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      ZEROCLAW_BASE_IMAGE: ${ZEROCLAW_BASE_IMAGE:-zeroclaw:0.8.0-beta2-matrix}
+      ZEROCLAW_INSTALL_PYTHON3: ${ZEROCLAW_INSTALL_PYTHON3:-false}
   user: "0:0"
   restart: unless-stopped
   working_dir: /zeroclaw-data/workspace
@@ -11,11 +17,6 @@ x-zeroclaw-common: &zeroclaw-common
     ZEROCLAW_CONFIG_DIR: /zeroclaw-data/.zeroclaw
     ZEROCLAW_DATA_DIR: ""
     ZEROCLAW_AGENT_WORKSPACE: /zeroclaw-data/workspace
-
-    DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-    DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
-    DEEPSEEK_WIRE_API: ${DEEPSEEK_WIRE_API:-chat_completions}
-    ZEROCLAW_providers__models__deepseek__text__api_key: ${DEEPSEEK_API_KEY:-}
 
     VISION_MODEL: ${VISION_MODEL:-gpt-4o}
     VISION_BASE_URL: ${VISION_BASE_URL:-https://api.openai.com/v1}
@@ -59,11 +60,13 @@ x-zeroclaw-common: &zeroclaw-common
     MCP_URL: ${MCP_URL:-}
     MCP_DEFERRED_LOADING: ${MCP_DEFERRED_LOADING:-true}
     MCP_TOOL_TIMEOUT_SECS: ${MCP_TOOL_TIMEOUT_SECS:-120}
-    MCP_GATEWAY_TOKEN: ${MCP_GATEWAY_TOKEN:-}
+    SHELL_TIMEOUT_SECS: ${SHELL_TIMEOUT_SECS:-300}
+    SHELL_TOOL_TIMEOUT_SECS: ${SHELL_TOOL_TIMEOUT_SECS:-300}
   volumes:
     - ./bootstrap:/bootstrap:ro
   extra_hosts:
     - "host.docker.internal:host-gateway"
+    - "matrix-host:${MATRIX_HOST_IP:-127.0.0.1}"
   healthcheck:
     test: ["CMD", "zeroclaw", "status", "--format=exit-code"]
     interval: 60s
@@ -83,6 +86,14 @@ services:
     environment:
       <<: *zeroclaw-common-env
       BOT_NAME: agent1
+      MODEL_PROVIDER_FAMILY: ${AGENT1_MODEL_PROVIDER_FAMILY:-deepseek}
+      MODEL_PROVIDER_ALIAS: ${AGENT1_MODEL_PROVIDER_ALIAS:-text}
+      MODEL_PROVIDER_MODEL: ${AGENT1_MODEL:-${DEEPSEEK_MODEL:-deepseek-chat}}
+      MODEL_PROVIDER_BASE_URL: ${AGENT1_MODEL_BASE_URL:-${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}}
+      MODEL_PROVIDER_API_KEY: ${AGENT1_MODEL_API_KEY:-${DEEPSEEK_API_KEY:-}}
+      MODEL_PROVIDER_WIRE_API: ${AGENT1_MODEL_WIRE_API:-${DEEPSEEK_WIRE_API:-chat_completions}}
+      MODEL_PROVIDER_TIMEOUT_SECS: ${AGENT1_MODEL_TIMEOUT_SECS:-120}
+      MODEL_PROVIDER_KIND: ${AGENT1_MODEL_KIND:-}
       MATRIX_USER_ID: ${AGENT1_MATRIX_USER_ID:-${BOT1_MATRIX_USER_ID:-}}
       MATRIX_DEVICE_ID: ${AGENT1_MATRIX_DEVICE_ID:-${BOT1_MATRIX_DEVICE_ID:-ZEROCLAW_AGENT1}}
       MATRIX_RECOVERY_KEY: ${AGENT1_MATRIX_RECOVERY_KEY:-${BOT1_MATRIX_RECOVERY_KEY:-}}
@@ -91,6 +102,7 @@ services:
       MATRIX_PEERS: ${AGENT1_MATRIX_PEERS:-${BOT1_MATRIX_PEERS:-}}
       ZEROCLAW_channels__matrix__home__access_token: ${AGENT1_MATRIX_ACCESS_TOKEN:-${BOT1_MATRIX_ACCESS_TOKEN:-}}
       ZEROCLAW_channels__matrix__home__password: ${AGENT1_MATRIX_PASSWORD:-${BOT1_MATRIX_PASSWORD:-}}
+      MCP_GATEWAY_TOKEN: ${AGENT1_MCP_GATEWAY_TOKEN:-${MCP_GATEWAY_TOKEN:-}}
 
   agent2:
     <<: *zeroclaw-common
@@ -103,6 +115,14 @@ services:
     environment:
       <<: *zeroclaw-common-env
       BOT_NAME: agent2
+      MODEL_PROVIDER_FAMILY: ${AGENT2_MODEL_PROVIDER_FAMILY:-ollama}
+      MODEL_PROVIDER_ALIAS: ${AGENT2_MODEL_PROVIDER_ALIAS:-local}
+      MODEL_PROVIDER_MODEL: ${AGENT2_MODEL:-qwen2.5:14b}
+      MODEL_PROVIDER_BASE_URL: ${AGENT2_MODEL_BASE_URL:-http://host.docker.internal:11434}
+      MODEL_PROVIDER_API_KEY: ${AGENT2_MODEL_API_KEY:-}
+      MODEL_PROVIDER_WIRE_API: ${AGENT2_MODEL_WIRE_API:-chat_completions}
+      MODEL_PROVIDER_TIMEOUT_SECS: ${AGENT2_MODEL_TIMEOUT_SECS:-600}
+      MODEL_PROVIDER_KIND: ${AGENT2_MODEL_KIND:-}
       MATRIX_USER_ID: ${AGENT2_MATRIX_USER_ID:-${BOT2_MATRIX_USER_ID:-}}
       MATRIX_DEVICE_ID: ${AGENT2_MATRIX_DEVICE_ID:-${BOT2_MATRIX_DEVICE_ID:-ZEROCLAW_AGENT2}}
       MATRIX_RECOVERY_KEY: ${AGENT2_MATRIX_RECOVERY_KEY:-${BOT2_MATRIX_RECOVERY_KEY:-}}
@@ -111,6 +131,7 @@ services:
       MATRIX_PEERS: ${AGENT2_MATRIX_PEERS:-${BOT2_MATRIX_PEERS:-}}
       ZEROCLAW_channels__matrix__home__access_token: ${AGENT2_MATRIX_ACCESS_TOKEN:-${BOT2_MATRIX_ACCESS_TOKEN:-}}
       ZEROCLAW_channels__matrix__home__password: ${AGENT2_MATRIX_PASSWORD:-${BOT2_MATRIX_PASSWORD:-}}
+      MCP_GATEWAY_TOKEN: ${AGENT2_MCP_GATEWAY_TOKEN:-${MCP_GATEWAY_TOKEN:-}}
 
   agent3:
     <<: *zeroclaw-common
@@ -123,6 +144,14 @@ services:
     environment:
       <<: *zeroclaw-common-env
       BOT_NAME: agent3
+      MODEL_PROVIDER_FAMILY: "${AGENT3_MODEL_PROVIDER_FAMILY:-gemini}"
+      MODEL_PROVIDER_ALIAS: "${AGENT3_MODEL_PROVIDER_ALIAS:-flash}"
+      MODEL_PROVIDER_MODEL: "${AGENT3_MODEL:-gemini-2.5-flash}"
+      MODEL_PROVIDER_BASE_URL: "${AGENT3_MODEL_BASE_URL:-}"
+      MODEL_PROVIDER_API_KEY: "${AGENT3_MODEL_API_KEY:-}"
+      MODEL_PROVIDER_WIRE_API: "${AGENT3_MODEL_WIRE_API:-}"
+      MODEL_PROVIDER_TIMEOUT_SECS: "${AGENT3_MODEL_TIMEOUT_SECS:-120}"
+      MODEL_PROVIDER_KIND: "${AGENT3_MODEL_KIND:-}"
       MATRIX_USER_ID: "${AGENT3_MATRIX_USER_ID:-}"
       MATRIX_DEVICE_ID: "${AGENT3_MATRIX_DEVICE_ID:-ZEROCLAW_AGENT3}"
       MATRIX_RECOVERY_KEY: "${AGENT3_MATRIX_RECOVERY_KEY:-}"
@@ -131,7 +160,7 @@ services:
       MATRIX_PEERS: "${AGENT3_MATRIX_PEERS:-}"
       ZEROCLAW_channels__matrix__home__access_token: "${AGENT3_MATRIX_ACCESS_TOKEN:-}"
       ZEROCLAW_channels__matrix__home__password: "${AGENT3_MATRIX_PASSWORD:-}"
-
+      MCP_GATEWAY_TOKEN: "${AGENT3_MCP_GATEWAY_TOKEN:-${MCP_GATEWAY_TOKEN:-}}"
   proactive:
     image: ${PROACTIVE_IMAGE:-python:3.12-alpine}
     container_name: zeroclaw-matrix-proactive
@@ -156,5 +185,4 @@ services:
       PROACTIVE_TIMEZONE: ${PROACTIVE_TIMEZONE:-Asia/Tokyo}
       PROACTIVE_PROMPT: ${PROACTIVE_PROMPT:-You are being invoked by the proactive sidecar, not by the user. Review HEARTBEAT.md, memory, and current context. If there is a concrete, timely reason to contact the user, send one short Matrix message with send_message_to_peer using the configured channel and peer target. If there is no useful reason, respond exactly with "skip".}
     command: ["python", "/app/proactive.py"]
-
 

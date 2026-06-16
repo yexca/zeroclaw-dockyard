@@ -1,9 +1,17 @@
-﻿param(
+param(
     [int]$Id = 0,
     [int]$HostPort = 0,
     [string]$MatrixUserId = "",
     [string]$ExternalPeers = "",
     [string]$ProactiveTarget = "",
+    [string]$ProviderFamily = "ollama",
+    [string]$ProviderAlias = "local",
+    [string]$Model = "qwen2.5:14b",
+    [string]$BaseUrl = "http://host.docker.internal:11434",
+    [string]$ApiKey = "",
+    [string]$WireApi = "chat_completions",
+    [int]$ModelTimeoutSecs = 600,
+    [string]$Kind = "",
     [switch]$NoComposeEdit,
     [switch]$NoEnvEdit,
     [switch]$DryRun
@@ -150,12 +158,21 @@ function Ensure-AgentEnv($AgentName, $AgentId, $Port) {
     }
 
     $lines = Upsert-EnvLine $lines "${prefix}_HOST_PORT" "$Port"
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_PROVIDER_FAMILY" $ProviderFamily
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_PROVIDER_ALIAS" $ProviderAlias
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL" $Model
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_BASE_URL" $BaseUrl
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_API_KEY" $ApiKey
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_WIRE_API" $WireApi
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_TIMEOUT_SECS" "$ModelTimeoutSecs"
+    $lines = Upsert-EnvLine $lines "${prefix}_MODEL_KIND" $Kind
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_USER_ID" $MatrixUserId
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_DEVICE_ID" "ZEROCLAW_AGENT$AgentId"
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_ACCESS_TOKEN" ""
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_PASSWORD" ""
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_RECOVERY_KEY" ""
     $lines = Upsert-EnvLine $lines "${prefix}_MATRIX_EXTERNAL_PEERS" $ExternalPeers
+    $lines = Upsert-EnvLine $lines "${prefix}_MCP_GATEWAY_TOKEN" ""
     $lines = Upsert-EnvMapping $lines "PROACTIVE_AGENTS" $AgentName "http://${AgentName}:42617/webhook"
     $lines = Upsert-EnvMapping $lines "PROACTIVE_CHANNELS" $AgentName "matrix.home"
     $lines = Upsert-EnvMapping $lines "PROACTIVE_TARGETS" $AgentName $ProactiveTarget
@@ -205,6 +222,14 @@ function Get-AgentServiceBlock($AgentName, $AgentId, $Port) {
     environment:
       <<: *zeroclaw-common-env
       BOT_NAME: ${AgentName}
+      MODEL_PROVIDER_FAMILY: "${${upper}_MODEL_PROVIDER_FAMILY:-ollama}"
+      MODEL_PROVIDER_ALIAS: "${${upper}_MODEL_PROVIDER_ALIAS:-local}"
+      MODEL_PROVIDER_MODEL: "${${upper}_MODEL:-qwen2.5:14b}"
+      MODEL_PROVIDER_BASE_URL: "${${upper}_MODEL_BASE_URL:-http://host.docker.internal:11434}"
+      MODEL_PROVIDER_API_KEY: "${${upper}_MODEL_API_KEY:-}"
+      MODEL_PROVIDER_WIRE_API: "${${upper}_MODEL_WIRE_API:-chat_completions}"
+      MODEL_PROVIDER_TIMEOUT_SECS: "${${upper}_MODEL_TIMEOUT_SECS:-600}"
+      MODEL_PROVIDER_KIND: "${${upper}_MODEL_KIND:-}"
       MATRIX_USER_ID: "${${upper}_MATRIX_USER_ID:-}"
       MATRIX_DEVICE_ID: "${${upper}_MATRIX_DEVICE_ID:-ZEROCLAW_AGENT${AgentId}}"
       MATRIX_RECOVERY_KEY: "${${upper}_MATRIX_RECOVERY_KEY:-}"
@@ -213,6 +238,7 @@ function Get-AgentServiceBlock($AgentName, $AgentId, $Port) {
       MATRIX_PEERS: "${${upper}_MATRIX_PEERS:-}"
       ZEROCLAW_channels__matrix__home__access_token: "${${upper}_MATRIX_ACCESS_TOKEN:-}"
       ZEROCLAW_channels__matrix__home__password: "${${upper}_MATRIX_PASSWORD:-}"
+      MCP_GATEWAY_TOKEN: "${${upper}_MCP_GATEWAY_TOKEN:-${MCP_GATEWAY_TOKEN:-}}"
 
 '@
     return $template.
@@ -299,6 +325,5 @@ Ensure-AgentEnv $AgentName $Id $HostPort
 Ensure-ComposeService $AgentName $Id $HostPort
 
 Say "done"
-Say "Next: fill ${AgentName}'s Matrix values in .env and edit instances/${AgentName}/workspace/*.md."
+Say "Next: fill ${AgentName}'s Matrix/provider values in .env and edit instances/${AgentName}/workspace/*.md."
 Say "Start it with: docker compose up -d $AgentName"
-
