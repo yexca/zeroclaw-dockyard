@@ -17,6 +17,16 @@ instances/*/workspace/sessions/
 instances/*/workspace/state/
 instances/**/*.db
 instances/**/*.db-*
+instances/**/*.sock
+instances/**/*.sqlite
+instances/**/*.sqlite3
+instances/**/*.jsonl
+instances/**/matrix_files/
+instances/**/store/
+instances/**/*.png
+instances/**/*.jpg
+instances/**/*.jpeg
+instances/**/*.webp
 proactive/state/
 proactive/*.db
 proactive/*.db-*
