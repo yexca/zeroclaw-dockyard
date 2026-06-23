@@ -78,7 +78,21 @@
   "prompts": {
     "title": "Prompt Templates",
     "subtitle": "Edit reusable workspace prompt files and duplicate templates.",
-    "empty": "Create or select a prompt template."
+    "empty": "Create or select a prompt template.",
+    "orderTitle": "Prompt file behavior",
+    "orderSummary": "Official ZeroClaw prompt files and their read order",
+    "orderSystem": "Normal channel turns read workspace files from the workspace root in the source-defined bootstrap order. The file tabs below are ordered to match that read order where applicable. HEARTBEAT.md also lives at the workspace root, but is for the heartbeat worker only and is not injected into normal channel prompts.",
+    "orderFlow": "normal channel system prompt:\n  tools/safety/skills/workspace\n  + AGENTS.md\n  + SOUL.md\n  + TOOLS.md\n  + IDENTITY.md\n  + USER.md\n  + BOOTSTRAP.md if it exists\n  + MEMORY.md when memory injection is enabled\n  + current date/runtime/channel capabilities\n\nheartbeat worker:\n  reads HEARTBEAT.md from the workspace root\n  parses lines that start with \"- \" as periodic tasks\n  supports [high], [medium], [low], [paused], [completed] metadata\n\ncustom files:\n  written to the workspace root only\n  not read automatically unless an official file tells the agent to use them",
+    "customNote": "The default contents here mirror ZeroClaw's personality template preset. Placeholders such as {agent}, {user}, {tz}, and {comm_style} are starter text that you can edit before applying a template.",
+    "filesLabel": "Template files",
+    "officialFile": "Official",
+    "readOrder": "Read #{n}",
+    "heartbeatOnly": "Heartbeat only",
+    "customFile": "Custom",
+    "officialFileHelp": "This file is injected into the normal channel system prompt in the numbered order shown on its tab.",
+    "heartbeatFileHelp": "This file is read by the heartbeat worker from the workspace root and is not injected into normal channel prompts.",
+    "customFileHelp": "This file is written to the workspace root only; reference it from an official file to make it effective.",
+    "addFilePrompt": "New workspace file name"
   },
   "export": {
     "title": "Config Export",
@@ -101,7 +115,9 @@
     "downloadLogs": "Download logs",
     "refreshStatus": "Refresh status",
     "applyTemplate": "Apply template",
-    "export": "Export"
+    "export": "Export",
+    "addFile": "Add file",
+    "removeFile": "Remove file"
   },
   "fields": {
     "id": "ID",
@@ -172,7 +188,8 @@
     "excludedTools": "Excluded tools",
     "replyMinIntervalSecs": "Reply min interval seconds",
     "replyQueueDepthMax": "Reply queue depth max",
-    "hostIp": "Matrix host IP"
+    "hostIp": "Matrix host IP",
+    "templateFile": "Template file"
   },
   "templateApply": {
     "keep": "Keep existing files",
@@ -196,13 +213,15 @@
     "invalidMinNumberField": "{field} must be greater than or equal to {min}.",
     "invalidMaxNumberField": "{field} must be less than or equal to {max}.",
     "invalidUrlField": "{field} must be a valid http/https URL. Please check it again.",
-    "requiredField": "{field} is required. Please fill it in."
+    "requiredField": "{field} is required. Please fill it in.",
+    "invalidTemplateFile": "Template file names must be plain workspace file names using letters, numbers, dot, underscore, or hyphen."
   },
   "confirm": {
     "deleteAgent": "Delete this agent? This cannot be undone.",
     "deleteProfile": "Delete this profile? Assigned agents may need updates.",
     "deleteTemplate": "Delete this prompt template?",
-    "overwriteWorkspace": "Overwrite existing workspace prompt files?"
+    "overwriteWorkspace": "Overwrite existing workspace prompt files?",
+    "deleteTemplateFile": "Remove this custom template file?"
   },
   "common": {
     "loading": "Loading...",

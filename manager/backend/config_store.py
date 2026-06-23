@@ -20,6 +20,7 @@ PROFILE_COLLECTIONS = {
 }
 
 PROMPT_TEMPLATE_KEY = "prompt_templates"
+OFFICIAL_PROMPT_TEMPLATE_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md", "HEARTBEAT.md"]
 
 
 class ConfigError(Exception):
@@ -114,6 +115,7 @@ class ConfigStore:
             from .agent_renderer import AgentRenderer
             from .config_validator import ConfigValidator
         project_root = config_path.resolve().parents[1] if len(config_path.resolve().parents) > 1 else Path.cwd()
+        self.project_root = project_root
         self.renderer = AgentRenderer(project_root)
         self.validator = ConfigValidator(project_root)
 
@@ -274,8 +276,41 @@ class ConfigStore:
             "mcp": normalize_collection(profiles.get("mcp")),
         }
         config[PROMPT_TEMPLATE_KEY] = normalize_collection(config.get(PROMPT_TEMPLATE_KEY))
+        config[PROMPT_TEMPLATE_KEY] = self._normalize_prompt_templates(config[PROMPT_TEMPLATE_KEY])
         config["agents"] = normalize_collection(config.get("agents"))
         return config
+
+    def _normalize_prompt_templates(self, templates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        defaults = self._default_prompt_template_files()
+        if not templates:
+            return [{"id": "default", "name": "Default workspace", "files": defaults}]
+        for template in templates:
+            files = template.get("files")
+            if not isinstance(files, dict):
+                files = {}
+            normalized_files = {str(key): str(value) for key, value in files.items()}
+            for filename, content in defaults.items():
+                if not normalized_files.get(filename):
+                    normalized_files[filename] = content
+            template["files"] = normalized_files
+        return templates
+
+    def _default_prompt_template_files(self) -> dict[str, str]:
+        template_dirs = [
+            self.project_root / "templates" / "workspace",
+            Path(__file__).resolve().parent / "prompt_templates",
+        ]
+        result: dict[str, str] = {}
+        for filename in OFFICIAL_PROMPT_TEMPLATE_FILES:
+            result[filename] = ""
+            for template_dir in template_dirs:
+                path = template_dir / filename
+                try:
+                    result[filename] = path.read_text(encoding="utf-8")
+                    break
+                except OSError:
+                    continue
+        return result
 
     def _get_collection(self, config: dict[str, Any], kind: str) -> list[dict[str, Any]]:
         if kind in PROFILE_COLLECTIONS:

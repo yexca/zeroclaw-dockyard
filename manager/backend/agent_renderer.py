@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -14,7 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - package import path for tests
     from .config_store import ConfigError, item_id
 
 
-PROMPT_TEMPLATE_FILES = {"AGENTS.md", "IDENTITY.md", "SOUL.md", "MEMORY.md", "TOOLS.md", "USER.md", "HEARTBEAT.md"}
+PROMPT_TEMPLATE_FILES = {"AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "HEARTBEAT.md", "BOOTSTRAP.md", "MEMORY.md"}
 DEFAULT_ZEROCLAW_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian"
 REQUIRED_ENV_KEYS = [
     "BOT_NAME",
@@ -216,7 +216,7 @@ class AgentRenderer:
         merged: list[str] = []
         conflicts: list[str] = []
         for filename, content in files.items():
-            if filename not in PROMPT_TEMPLATE_FILES:
+            if not is_safe_workspace_file(filename):
                 skipped.append(filename)
                 continue
             target = workspace_dir / filename
@@ -322,6 +322,21 @@ def normalize_template_files(files: Any) -> dict[str, str]:
                 result[str(item["name"])] = str(item.get("content") or "")
         return result
     return {}
+
+
+def is_safe_workspace_file(filename: str) -> bool:
+    text = str(filename or "").strip()
+    if not text or len(text) > 128 or "\\" in text:
+        return False
+    path = PurePosixPath(text)
+    return (
+        len(path.parts) == 1
+        and path.name == text
+        and path.name not in {"", ".", ".."}
+        and ".." not in path.parts
+        and all(ch.isalnum() or ch in "._-" for ch in text)
+        and text[0].isalnum()
+    )
 
 
 def render_env_file(env: dict[str, str]) -> str:

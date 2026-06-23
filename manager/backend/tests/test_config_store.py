@@ -28,6 +28,18 @@ class ConfigStoreTest(unittest.TestCase):
         self.config_path = root / "manager.yaml"
         self.example_path = root / "manager.example.yaml"
         self.generated_dir = root / "generated"
+        templates_dir = root / "templates" / "workspace"
+        templates_dir.mkdir(parents=True)
+        for filename, content in {
+            "AGENTS.md": "# AGENTS.md\n\nDefault Personal Assistant",
+            "SOUL.md": "# SOUL.md\n\nDefault soul",
+            "TOOLS.md": "# TOOLS.md\n\nDefault tools",
+            "IDENTITY.md": "# IDENTITY.md\n\nDefault identity",
+            "USER.md": "# USER.md\n\nDefault user",
+            "HEARTBEAT.md": "# HEARTBEAT.md\n\n# Keep this file empty",
+            "MEMORY.md": "# MEMORY.md\n\nDefault memory",
+        }.items():
+            (templates_dir / filename).write_text(content, encoding="utf-8")
         self.example_path.write_text(
             yaml.safe_dump(
                 {
@@ -54,6 +66,19 @@ class ConfigStoreTest(unittest.TestCase):
         self.assertEqual(config["webui"]["default_language"], "en")
         self.assertEqual(config["profiles"]["llm"][0]["id"], "deepseek-text")
         self.assertEqual(config["agents"][0]["id"], "agent1")
+
+    def test_load_adds_default_prompt_template_when_missing(self) -> None:
+        self.config_path.write_text(yaml.safe_dump({"version": 1, "prompt_templates": []}), encoding="utf-8")
+
+        config = self.store.load()
+        template = config["prompt_templates"][0]
+
+        self.assertEqual(template["id"], "default")
+        self.assertIn("AGENTS.md", template["files"])
+        self.assertIn("SOUL.md", template["files"])
+        self.assertIn("HEARTBEAT.md", template["files"])
+        self.assertIn("Personal Assistant", template["files"]["AGENTS.md"])
+        self.assertIn("Keep this file empty", template["files"]["HEARTBEAT.md"])
 
     def test_profile_crud_is_persisted(self) -> None:
         created = self.store.create_item("llm", {"id": "local", "model": "qwen"})
@@ -113,7 +138,9 @@ class ConfigStoreTest(unittest.TestCase):
 
         result = self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
 
-        self.assertEqual(result["written"], ["AGENTS.md"])
+        self.assertIn("AGENTS.md", result["written"])
+        self.assertIn("SOUL.md", result["written"])
+        self.assertIn("HEARTBEAT.md", result["written"])
         self.assertEqual(
             (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
             "hello",
@@ -408,6 +435,22 @@ class AgentRendererTest(unittest.TestCase):
         self.assertIn("AGENTS.md", merge["merged"])
         self.assertIn("user edit", agents_file.read_text(encoding="utf-8"))
         self.assertIn("ZeroClaw template merge", agents_file.read_text(encoding="utf-8"))
+
+    def test_workspace_allows_safe_custom_prompt_template_files(self) -> None:
+        config = copy_config(self.config)
+        config["prompt_templates"][0]["files"]["BOOTSTRAP.md"] = "first run"
+        config["prompt_templates"][0]["files"]["RHYTHM.md"] = "custom rhythm"
+        config["prompt_templates"][0]["files"]["../escape.md"] = "nope"
+
+        result = self.renderer.initialize_workspace(config, self.agent, mode="overwrite")
+        workspace = Path(result["workspace"])
+
+        self.assertIn("BOOTSTRAP.md", result["written"])
+        self.assertIn("RHYTHM.md", result["written"])
+        self.assertIn("../escape.md", result["skipped"])
+        self.assertEqual((workspace / "BOOTSTRAP.md").read_text(encoding="utf-8"), "first run")
+        self.assertEqual((workspace / "RHYTHM.md").read_text(encoding="utf-8"), "custom rhythm")
+        self.assertFalse((workspace.parent / "escape.md").exists())
 
     def test_export_agent_returns_env_compose_and_preview(self) -> None:
         exported = self.renderer.export_agent(self.config, self.agent)

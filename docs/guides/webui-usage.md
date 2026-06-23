@@ -25,6 +25,38 @@ agent containers start until the WebUI creates them.
 - Prompt templates: edit workspace files that can be applied to agents.
 - Export: write redacted generated configuration under `config/generated/`.
 
+## Prompt Templates
+
+Prompt templates edit reusable files that the manager can write into an
+agent's workspace root. The editor shows files as horizontal tabs so operators
+can switch between official ZeroClaw personality files and custom workspace
+files without scrolling through every file at once.
+
+For normal channel turns, ZeroClaw's source-defined system prompt path injects
+workspace files in this order:
+
+```text
+normal channel system prompt:
+  tools/safety/skills/workspace
+  + AGENTS.md
+  + SOUL.md
+  + TOOLS.md
+  + IDENTITY.md
+  + USER.md
+  + BOOTSTRAP.md if it exists
+  + MEMORY.md when memory injection is enabled
+  + current date/runtime/channel capabilities
+```
+
+`HEARTBEAT.md` is also written to the workspace root, but it is intentionally
+excluded from normal channel prompts. The heartbeat worker reads it separately
+and treats lines beginning with `- ` as periodic tasks. Task metadata supports
+priority and status tags such as `[high]`, `[low|paused]`, and `[completed]`.
+
+Custom files such as `RHYTHM.md` can be saved and applied to a workspace, but
+ZeroClaw does not automatically read them. To make custom files effective,
+reference them from an official file such as `AGENTS.md` or `USER.md`.
+
 ## LLM Profiles
 
 The LLM Profiles view edits reusable model provider profiles under

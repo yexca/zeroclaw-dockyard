@@ -416,6 +416,51 @@ dd {
   color: var(--color-danger);
 }
 
+.info-panel {
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  background: var(--color-surface-soft);
+  padding: 14px;
+}
+
+.info-panel[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.info-panel summary {
+  cursor: pointer;
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.info-panel summary small {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-subtle);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.info-panel p {
+  margin-bottom: 0;
+}
+
+.info-panel pre {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .split {
   display: grid;
   grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
@@ -465,6 +510,77 @@ dd {
 
 .form-actions {
   margin-top: 16px;
+}
+
+.template-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.template-file-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.template-file-tab {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 132px;
+  max-width: 190px;
+  gap: 2px;
+  border: 1px solid var(--color-control-border);
+  border-radius: 6px;
+  background: var(--color-control-bg);
+  color: var(--color-text);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.template-file-tab span {
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.template-file-tab small {
+  color: var(--color-subtle);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.template-file-tab.active {
+  border-color: var(--color-primary);
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+}
+
+.template-file-tab.add {
+  place-content: center;
+  min-width: 116px;
+  text-align: center;
+}
+
+.template-file-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.template-file-meta strong {
+  color: var(--color-text);
+}
+
+.template-file-meta span {
+  flex: 1 1 auto;
+}
+
+.template-text-large {
+  min-height: 420px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
 .advanced-panel {

@@ -37,6 +37,26 @@ Common agent fields:
 - `environment`: explicit environment overrides for advanced use.
 - `allow_empty_external_peers`: bypasses peer validation for local testing.
 
+## Prompt Template Fields
+
+`prompt_templates` entries define reusable workspace files:
+
+- `id`: manager-local template ID selected by agents through
+  `prompt_template`.
+- `description`: optional operator note shown in the WebUI.
+- `files`: mapping of workspace file names to file content. Official prompt
+  files include `AGENTS.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`,
+  `BOOTSTRAP.md`, `MEMORY.md`, and `HEARTBEAT.md`. Safe custom file names such
+  as `RHYTHM.md` are also supported and written to the workspace when
+  templates are applied.
+
+Normal channel prompts inject `AGENTS.md`, `SOUL.md`, `TOOLS.md`,
+`IDENTITY.md`, `USER.md`, optional `BOOTSTRAP.md`, and optional `MEMORY.md`.
+`HEARTBEAT.md` is a workspace-root task file for the heartbeat worker and is
+not injected into ordinary channel prompts. Custom files are not referenced by
+ZeroClaw automatically; add an explicit reference from an official file when
+the model should use a custom workspace file.
+
 ## LLM Profile Fields
 
 `profiles.llm` entries describe reusable ZeroClaw model provider profiles. A
