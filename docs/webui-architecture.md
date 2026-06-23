@@ -152,6 +152,20 @@ Implemented in this stage:
 - Local plaintext secrets files are ignored by Git.
 - Example config files contain placeholders only.
 
+Implemented in the Docker runtime stage:
+
+- The manager talks to Docker only through `DOCKER_API_URL`, normally the
+  socket proxy on the internal `manager-control` network.
+- Agent runtime operations create stable `zeroclaw-matrix-{agent}` containers
+  with `zeroclaw.manager=true`, `zeroclaw.agent.id`, and
+  `zeroclaw.agent.name` labels.
+- Start reconciles desired container configuration, recreating only
+  manager-owned containers when the stored spec hash changes.
+- Stop, restart, delete, status, and logs refuse to operate on a same-named
+  container without matching manager labels.
+- Host gateway and Matrix host aliases are configured through Docker
+  `ExtraHosts`, and the gateway port is published on `127.0.0.1`.
+
 Deferred to later stages:
 
 - Validate all config and secret fields before writing files or touching

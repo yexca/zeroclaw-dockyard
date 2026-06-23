@@ -126,6 +126,7 @@ services:
       MANAGER_CONFIG_PATH: /app/config/manager.yaml
       MANAGER_SECRETS_PATH: /app/config/secrets.yaml
       GENERATED_CONFIG_DIR: /app/config/generated
+      HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-${PWD}}
       ZEROCLAW_IMAGE: ${ZEROCLAW_IMAGE:-ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian}
     volumes:
       - ./config:/app/config

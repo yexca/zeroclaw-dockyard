@@ -18,11 +18,11 @@ small Python backend with no build step, and this keeps the local-only manager
 container lightweight while still providing a complete API shape for later
 frontend and Docker integration phases.
 
-Docker lifecycle APIs currently use a `FakeDockerController` with the same
-method names and structured response shape that the real Docker API
-implementation should keep. Later stages will replace the fake controller with
-Docker socket proxy calls, generated ZeroClaw config rendering, and stronger
-runtime validation.
+Docker lifecycle APIs use the Docker socket proxy URL from `DOCKER_API_URL`.
+They create manager-owned agent containers with stable names, labels, bind
+mounts, loopback gateway port publishing, extra hosts, and the configured
+runtime network. Set `DOCKER_CONTROLLER=fake` to use the lightweight stub in
+tests or local UI-only development.
 
 The manager is intended to be reached only through the host loopback binding in
 `docker-compose.yml`.
@@ -61,10 +61,13 @@ falling back to `en` and `system` through backend defaults.
 
 ## Backend API
 
-The backend reads `MANAGER_CONFIG_PATH`, falling back to
-`config/manager.yaml`, and uses `config/manager.example.yaml` as a read-only
-bootstrap source when no local config exists. Writes are atomic and create the
-local config file. `GENERATED_CONFIG_DIR` controls `/api/export` output.
+The backend reads `MANAGER_CONFIG_PATH`, falling back to `config/manager.yaml`,
+and uses `config/manager.example.yaml` as a read-only bootstrap source when no
+local config exists. Writes are atomic and create the local config file.
+`GENERATED_CONFIG_DIR` controls `/api/export` output. Docker bind mounts need
+host paths, so the manager uses `HOST_PROJECT_DIR` by default and can be
+overridden with `paths.host_project_dir`, `paths.host_instances_dir`, or
+`paths.host_bootstrap_dir`.
 
 Core endpoints:
 
@@ -78,6 +81,7 @@ Core endpoints:
 - `GET|PUT|DELETE /api/agents/{id}`
 - `POST /api/agents/{id}/validate`
 - `POST /api/agents/{id}/{start|stop|restart}`
+- `POST /api/agents/{id}/delete`
 - `GET /api/agents/{id}/{status|logs}`
 - `POST /api/export`
 

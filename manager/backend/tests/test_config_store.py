@@ -7,7 +7,14 @@ from pathlib import Path
 import yaml
 
 from manager.backend.config_store import ConfigError, ConfigStore, redact
-from manager.backend.docker_controller import FakeDockerController
+from manager.backend.docker_controller import (
+    AGENT_ID_LABEL,
+    AGENT_NAME_LABEL,
+    MANAGER_LABEL,
+    DockerApiController,
+    FakeDockerController,
+    decode_docker_log_stream,
+)
 
 
 class ConfigStoreTest(unittest.TestCase):
@@ -104,14 +111,70 @@ class ConfigStoreTest(unittest.TestCase):
 
 
 class DockerControllerTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
     def test_fake_controller_returns_stable_operation_shape(self) -> None:
         controller = FakeDockerController("http://docker-socket-proxy:2375")
 
-        result = controller.start({"id": "agent1"})
+        result = controller.start({}, {"id": "agent1"})
 
         self.assertTrue(result["accepted"])
         self.assertEqual(result["operation"], "start")
         self.assertEqual(result["controller"], "fake")
+
+    def test_build_container_spec_uses_manager_labels_and_mounts(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+
+        spec = controller.build_container_spec(
+            {
+                "docker": {"project_name": "zeroclaw-matrix-multi"},
+                "paths": {},
+                "defaults": {"zeroclaw_image": "example/zeroclaw:test"},
+            },
+            {
+                "id": "agent1",
+                "name": "Agent One",
+                "host_port": 42641,
+                "matrix": {"user_id": "@agent1:example.test"},
+            },
+        )
+
+        self.assertEqual(spec.container_name, "zeroclaw-matrix-agent-one")
+        self.assertEqual(spec.image, "example/zeroclaw:test")
+        self.assertEqual(spec.network_name, "zeroclaw-matrix-multi_default")
+        self.assertEqual(spec.labels[MANAGER_LABEL], "true")
+        self.assertEqual(spec.labels[AGENT_ID_LABEL], "agent1")
+        self.assertEqual(spec.labels[AGENT_NAME_LABEL], "Agent One")
+        self.assertIn("host.docker.internal:host-gateway", spec.extra_hosts)
+
+    def test_manager_label_is_required_for_operations(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+        spec = controller.build_container_spec({}, {"id": "agent1", "host_port": 42641})
+
+        self.assertFalse(controller.is_managed_container({"Config": {"Labels": {}}}, spec))
+        self.assertTrue(
+            controller.is_managed_container(
+                {
+                    "Config": {
+                        "Labels": {
+                            MANAGER_LABEL: "true",
+                            AGENT_ID_LABEL: "agent1",
+                            AGENT_NAME_LABEL: "agent1",
+                        }
+                    }
+                },
+                spec,
+            )
+        )
+
+    def test_decode_docker_multiplexed_logs(self) -> None:
+        frame = b"\x01\x00\x00\x00" + (6).to_bytes(4, "big") + b"hello\n"
+
+        self.assertEqual(decode_docker_log_stream(frame), "hello\n")
 
 
 if __name__ == "__main__":

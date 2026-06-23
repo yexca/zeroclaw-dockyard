@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from config_store import ConfigError, ConfigStore, redact, to_json
-from docker_controller import FakeDockerController
+from docker_controller import DockerApiError, build_controller_from_env
 
 
 APP_ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +31,7 @@ def build_store() -> ConfigStore:
 
 
 STORE = build_store()
-DOCKER = FakeDockerController(os.getenv("DOCKER_API_URL", "http://docker-socket-proxy:2375"))
+DOCKER = build_controller_from_env(REPO_ROOT)
 
 
 def json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
@@ -106,6 +106,8 @@ class ManagerHandler(BaseHTTPRequestHandler):
             self.serve_frontend(path)
         except ConfigError as exc:
             error_response(self, exc.status, exc.code, exc.message, exc.details)
+        except DockerApiError as exc:
+            error_response(self, 502, "docker_api_error", exc.message, exc.details)
         except json.JSONDecodeError as exc:
             error_response(self, 400, "invalid_json", "Request body must be valid JSON.", {"error": str(exc)})
         except Exception as exc:  # pragma: no cover - defensive API boundary
@@ -123,7 +125,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 self,
                 200,
                 {
-                    "stage": "manager-backend-foundation",
+                    "stage": "docker-api-runtime",
                     "dockerApiUrl": os.getenv("DOCKER_API_URL", ""),
                     "managerConfigPath": str(STORE.config_path),
                     "generatedConfigDir": str(STORE.generated_dir),
@@ -214,6 +216,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
 
         if len(segments) == 2:
             identifier, action = segments
+            config = STORE.load()
             agent = STORE.get_agent(identifier)
             if method == "POST" and action == "validate":
                 success(self, 200, STORE.validate_agent(identifier))
@@ -221,15 +224,15 @@ class ManagerHandler(BaseHTTPRequestHandler):
             if method == "POST" and action == "apply-template":
                 success(self, 200, STORE.apply_prompt_template(identifier, self.read_optional_json()))
                 return
-            if method == "POST" and action in {"start", "stop", "restart"}:
-                success(self, 202, getattr(DOCKER, action)(agent))
+            if method == "POST" and action in {"start", "stop", "restart", "delete"}:
+                success(self, 202, getattr(DOCKER, action)(config, agent))
                 return
             if method == "GET" and action == "status":
-                success(self, 200, DOCKER.status(agent))
+                success(self, 200, DOCKER.status(config, agent))
                 return
             if method == "GET" and action == "logs":
                 tail = self.parse_tail(query)
-                success(self, 200, DOCKER.logs(agent, tail=tail))
+                success(self, 200, DOCKER.logs(config, agent, tail=tail))
                 return
 
         error_response(self, 405, "method_not_allowed", "Unsupported agent operation.", {"method": method})
