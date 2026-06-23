@@ -9,8 +9,8 @@ COPY backend/ /app/backend/
 COPY frontend/ /app/frontend/
 
 ENV MANAGER_BIND_HOST=0.0.0.0
-ENV MANAGER_PORT=8080
+ENV MANAGER_PORT=7652
 
-EXPOSE 8080
+EXPOSE 7652
 
 CMD ["python", "/app/backend/app.py"]

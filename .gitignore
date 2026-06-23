@@ -38,6 +38,3 @@ instances/**/*.png
 instances/**/*.jpg
 instances/**/*.jpeg
 instances/**/*.webp
-proactive/state/
-proactive/*.db
-proactive/*.db-*

@@ -9,7 +9,7 @@ Set-Location $repo
 
 Write-Host "== Secrets scan =="
 $secretPattern = "sk-[A-Za-z0-9_-]{12,}|ghp_|gho_|glpat-|xox[baprs]-|BEGIN (RSA|OPENSSH|PRIVATE) KEY|Bearer\s+[A-Za-z0-9_.=-]{12,}"
-$secretHits = rg -n $secretPattern . --glob '!prompts/**' --glob '!tools/release-checks.ps1' --glob '!config/*.local.yaml' --glob '!config/manager.yaml' --glob '!config/secrets.yaml' --glob '!instances/**' --glob '!proactive/state/**' --glob '!config/generated/**' 2>$null
+$secretHits = rg -n $secretPattern . --glob '!prompts/**' --glob '!tools/release-checks.ps1' --glob '!config/*.local.yaml' --glob '!config/manager.yaml' --glob '!config/secrets.yaml' --glob '!instances/**' --glob '!config/generated/**' 2>$null
 if ($LASTEXITCODE -eq 0) {
   Write-Error "Potential secrets found:`n$secretHits"
 }
@@ -20,7 +20,6 @@ Write-Host "No obvious secrets found."
 
 if (-not $SkipCompose) {
   Write-Host "== Compose config =="
-  $env:PWD = (Get-Location).Path
   docker compose config --quiet
 }
 

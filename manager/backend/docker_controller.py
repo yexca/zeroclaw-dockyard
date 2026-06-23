@@ -113,6 +113,7 @@ class DockerApiController:
         self.client = DockerApiClient(docker_api_url, timeout_secs=timeout_secs)
         self.renderer = AgentRenderer(project_root)
         self.validator = ConfigValidator(project_root)
+        self._manager_mounts: dict[str, str] | None = None
 
     def start(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         self.configure_client(config)
@@ -295,9 +296,10 @@ class DockerApiController:
         image = str(resolved.get("image") or defaults.get("zeroclaw_image") or os.getenv("ZEROCLAW_IMAGE") or DEFAULT_IMAGE)
         project_name = str(docker_config.get("project_name") or "zeroclaw-matrix-multi")
         network_name = str(docker_config.get("runtime_network") or f"{project_name}_default")
+        manager_mounts = self.manager_mount_sources()
         project_root = Path(str(paths.get("host_project_dir") or os.getenv("HOST_PROJECT_DIR") or self.project_root)).resolve()
-        instances_dir = Path(str(paths.get("host_instances_dir") or project_root / "instances")).resolve()
-        bootstrap_dir = Path(str(paths.get("host_bootstrap_dir") or project_root / "bootstrap")).resolve()
+        instances_dir = Path(str(paths.get("host_instances_dir") or manager_mounts.get("/app/instances") or project_root / "instances")).resolve()
+        bootstrap_dir = Path(str(paths.get("host_bootstrap_dir") or manager_mounts.get("/app/bootstrap") or project_root / "bootstrap")).resolve()
         env = self.renderer.render_env(config, resolved)
         matrix_host_ip = env.get("MATRIX_HOST_IP", "127.0.0.1")
 
@@ -343,6 +345,29 @@ class DockerApiController:
         if proxy_url != self.docker_api_url:
             self.docker_api_url = proxy_url
             self.client = DockerApiClient(proxy_url, timeout_secs=self.client.timeout_secs)
+            self._manager_mounts = None
+
+    def manager_mount_sources(self) -> dict[str, str]:
+        if self._manager_mounts is not None:
+            return self._manager_mounts
+        container_name = os.getenv("MANAGER_CONTAINER_NAME", "zeroclaw-manager")
+        try:
+            container = self.client.request("GET", f"/containers/{quote(container_name, safe='')}/json")
+        except DockerApiError:
+            self._manager_mounts = {}
+            return self._manager_mounts
+        mounts = container.get("Mounts") if isinstance(container, dict) else []
+        result: dict[str, str] = {}
+        if isinstance(mounts, list):
+            for mount in mounts:
+                if not isinstance(mount, dict):
+                    continue
+                destination = mount.get("Destination")
+                source = mount.get("Source")
+                if isinstance(destination, str) and isinstance(source, str):
+                    result[destination] = source
+        self._manager_mounts = result
+        return result
 
     def create_container(self, spec: "ContainerSpec") -> dict[str, Any]:
         spec.instance_dir.mkdir(parents=True, exist_ok=True)
@@ -576,9 +601,8 @@ def build_controller_from_env(project_root: Path) -> DockerController:
     mode = os.getenv("DOCKER_CONTROLLER", "api").lower()
     if mode == "fake":
         return FakeDockerController(docker_api_url)
-    host_project_dir = Path(os.getenv("HOST_PROJECT_DIR", str(project_root))).resolve()
     timeout_secs = int(os.getenv("DOCKER_API_TIMEOUT_SECS", "30"))
-    return DockerApiController(docker_api_url, host_project_dir, timeout_secs=timeout_secs)
+    return DockerApiController(docker_api_url, project_root, timeout_secs=timeout_secs)
 
 
 def safe_container_part(value: str) -> str:

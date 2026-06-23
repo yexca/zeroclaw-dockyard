@@ -405,7 +405,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     host = os.getenv("MANAGER_BIND_HOST", "0.0.0.0")
-    port = int(os.getenv("MANAGER_PORT", "8080"))
+    port = int(os.getenv("MANAGER_PORT", "7652"))
     server = ThreadingHTTPServer((host, port), ManagerHandler)
     print(f"ZeroClaw manager listening on {host}:{port}", flush=True)
     server.serve_forever()

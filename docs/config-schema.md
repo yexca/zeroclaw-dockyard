@@ -48,8 +48,9 @@ Common agent fields:
 - `agents.<agent>.matrix_recovery_key`
 - `agents.<agent>.mcp_gateway_token`
 
-The current manager UI stores secrets inline in the primary config when edited
-there. Exports and logs redact secret-like keys by default.
+The current manager UI may store secrets inline in the primary config when
+edited there. Exports and logs redact secret-like keys by default. Keep local
+config files out of Git either way.
 
 ## Validation
 

@@ -258,6 +258,18 @@ class DockerControllerTest(unittest.TestCase):
             )
         )
 
+    def test_build_container_spec_uses_manager_mount_sources(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+        controller._manager_mounts = {
+            "/app/instances": str(Path(self.temp_dir.name) / "host-instances"),
+            "/app/bootstrap": str(Path(self.temp_dir.name) / "host-bootstrap"),
+        }
+
+        spec = controller.build_container_spec({}, {"id": "agent1", "host_port": 42641})
+
+        self.assertEqual(spec.instance_dir, Path(self.temp_dir.name) / "host-instances" / "agent1")
+        self.assertEqual(spec.bootstrap_dir, Path(self.temp_dir.name) / "host-bootstrap")
+
     def test_decode_docker_multiplexed_logs(self) -> None:
         frame = b"\x01\x00\x00\x00" + (6).to_bytes(4, "big") + b"hello\n"
 
