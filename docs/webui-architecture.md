@@ -83,8 +83,13 @@ The target runtime flow is:
 5. Agent containers continue using `bootstrap/render-config.sh` to produce the
    final `/zeroclaw-data/.zeroclaw/config.toml` inside each instance.
 
-This stage intentionally does not implement the full reconciliation engine or
-agent lifecycle API.
+Agent rendering resolves profile references, agent overrides, and defaults into
+the environment variables expected by `bootstrap/render-config.sh`. The manager
+can export the resolved environment, an equivalent compose fragment, and a
+readable ZeroClaw `config.toml` preview before a container is started.
+Workspace initialization writes selected prompt template files under
+`instances/{agent}/workspace` and supports explicit keep, missing-only,
+overwrite, and merge modes.
 
 ## Docker API Flow
 

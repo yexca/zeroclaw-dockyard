@@ -14,8 +14,10 @@ from urllib.parse import quote, urlencode, urljoin
 from urllib.request import Request, urlopen
 
 try:
+    from agent_renderer import AgentRenderer
     from config_store import ConfigError, item_id, redact
 except ModuleNotFoundError:  # pragma: no cover - package import path for tests
+    from .agent_renderer import AgentRenderer
     from .config_store import ConfigError, item_id, redact
 
 
@@ -107,6 +109,7 @@ class DockerApiController:
         self.docker_api_url = docker_api_url
         self.project_root = project_root
         self.client = DockerApiClient(docker_api_url, timeout_secs=timeout_secs)
+        self.renderer = AgentRenderer(project_root)
 
     def start(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         self.configure_client(config)
@@ -258,12 +261,13 @@ class DockerApiController:
         }
 
     def build_container_spec(self, config: dict[str, Any], agent: dict[str, Any]) -> "ContainerSpec":
-        agent_identifier = item_id(agent)
+        resolved = self.renderer.resolve_agent(config, agent)
+        agent_identifier = item_id(resolved)
         if not agent_identifier:
             raise ConfigError("invalid_agent", "Agent requires an id or name.")
-        agent_name = str(agent.get("name") or agent_identifier)
+        agent_name = str(resolved.get("name") or agent_identifier)
         safe_name = safe_container_part(agent_name)
-        host_port = agent.get("host_port")
+        host_port = resolved.get("host_port")
         if not isinstance(host_port, int):
             raise ConfigError("invalid_agent", "Agent host_port must be an integer.", {"agent": agent_identifier})
 
@@ -271,15 +275,15 @@ class DockerApiController:
         paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
         defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
 
-        image = str(agent.get("image") or defaults.get("zeroclaw_image") or os.getenv("ZEROCLAW_IMAGE") or DEFAULT_IMAGE)
+        image = str(resolved.get("image") or defaults.get("zeroclaw_image") or os.getenv("ZEROCLAW_IMAGE") or DEFAULT_IMAGE)
         project_name = str(docker_config.get("project_name") or "zeroclaw-matrix-multi")
         network_name = str(docker_config.get("runtime_network") or f"{project_name}_default")
         project_root = Path(str(paths.get("host_project_dir") or os.getenv("HOST_PROJECT_DIR") or self.project_root)).resolve()
         instances_dir = Path(str(paths.get("host_instances_dir") or project_root / "instances")).resolve()
         bootstrap_dir = Path(str(paths.get("host_bootstrap_dir") or project_root / "bootstrap")).resolve()
-        matrix_host_ip = str(agent.get("matrix_host_ip") or docker_config.get("matrix_host_ip") or os.getenv("MATRIX_HOST_IP") or "127.0.0.1")
+        env = self.renderer.render_env(config, resolved)
+        matrix_host_ip = env.get("MATRIX_HOST_IP", "127.0.0.1")
 
-        env = self.build_environment(config, agent, agent_identifier, agent_name)
         labels = {
             MANAGER_LABEL: "true",
             AGENT_ID_LABEL: str(agent_identifier),
@@ -322,88 +326,6 @@ class DockerApiController:
         if proxy_url != self.docker_api_url:
             self.docker_api_url = proxy_url
             self.client = DockerApiClient(proxy_url, timeout_secs=self.client.timeout_secs)
-
-    def build_environment(self, config: dict[str, Any], agent: dict[str, Any], agent_id: str, agent_name: str) -> dict[str, str]:
-        env: dict[str, str] = {
-            "LANG": "C.UTF-8",
-            "BOT_NAME": agent_name,
-            "ZEROCLAW_CONFIG_DIR": "/zeroclaw-data/.zeroclaw",
-            "ZEROCLAW_DATA_DIR": "",
-            "ZEROCLAW_AGENT_WORKSPACE": "/zeroclaw-data/workspace",
-        }
-
-        matrix_defaults = config.get("defaults", {}).get("matrix", {}) if isinstance(config.get("defaults"), dict) else {}
-        llm = agent.get("model") if isinstance(agent.get("model"), dict) else {}
-        matrix = deep_dict_merge(matrix_defaults, agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {})
-        mcp = agent.get("mcp") if isinstance(agent.get("mcp"), dict) else {}
-        vision = config.get("vision") if isinstance(config.get("vision"), dict) else {}
-        runtime = config.get("runtime") if isinstance(config.get("runtime"), dict) else {}
-        heartbeat = config.get("heartbeat") if isinstance(config.get("heartbeat"), dict) else {}
-
-        mapping = {
-            "MODEL_PROVIDER_FAMILY": llm.get("provider_family") or llm.get("family"),
-            "MODEL_PROVIDER_ALIAS": llm.get("provider_alias") or llm.get("alias"),
-            "MODEL_PROVIDER_MODEL": llm.get("model"),
-            "MODEL_PROVIDER_BASE_URL": llm.get("base_url"),
-            "MODEL_PROVIDER_API_KEY": llm.get("api_key"),
-            "MODEL_PROVIDER_WIRE_API": llm.get("wire_api"),
-            "MODEL_PROVIDER_TIMEOUT_SECS": llm.get("timeout_secs"),
-            "MODEL_PROVIDER_KIND": llm.get("kind"),
-            "MATRIX_HOMESERVER": matrix.get("homeserver"),
-            "MATRIX_USER_ID": matrix.get("user_id") or agent.get("matrix_user_id"),
-            "MATRIX_DEVICE_ID": matrix.get("device_id") or agent.get("matrix_device_id"),
-            "MATRIX_RECOVERY_KEY": matrix.get("recovery_key"),
-            "MATRIX_RECOVER_KEY": matrix.get("recover_key") or matrix.get("recovery_key"),
-            "MATRIX_EXTERNAL_PEERS": join_value(matrix.get("external_peers")),
-            "MATRIX_PEERS": join_value(matrix.get("peers") or matrix.get("external_peers")),
-            "MATRIX_ALLOWED_ROOMS": join_value(matrix.get("allowed_rooms")),
-            "MATRIX_MENTION_ONLY": matrix.get("mention_only"),
-            "MATRIX_INTERRUPT_ON_NEW_MESSAGE": matrix.get("interrupt_on_new_message"),
-            "MATRIX_REPLY_IN_THREAD": matrix.get("reply_in_thread"),
-            "MATRIX_ACK_REACTIONS": matrix.get("ack_reactions"),
-            "MATRIX_STREAM_MODE": matrix.get("stream_mode"),
-            "MATRIX_MULTI_MESSAGE": matrix.get("multi_message"),
-            "MATRIX_MULTI_MESSAGE_DELAY_MS": matrix.get("multi_message_delay_ms"),
-            "CHANNEL_DEBOUNCE_MS": matrix.get("channel_debounce_ms"),
-            "ZEROCLAW_channels__matrix__home__access_token": matrix.get("access_token"),
-            "ZEROCLAW_channels__matrix__home__password": matrix.get("password"),
-            "MCP_ENABLED": mcp.get("enabled"),
-            "MCP_SERVER_NAME": mcp.get("server_name"),
-            "MCP_TRANSPORT": mcp.get("transport"),
-            "MCP_URL": mcp.get("url"),
-            "MCP_DEFERRED_LOADING": mcp.get("deferred_loading"),
-            "MCP_TOOL_TIMEOUT_SECS": mcp.get("tool_timeout_secs"),
-            "MCP_GATEWAY_TOKEN": mcp.get("gateway_token"),
-            "VISION_MODEL": vision.get("model"),
-            "VISION_BASE_URL": vision.get("base_url"),
-            "VISION_WIRE_API": vision.get("wire_api"),
-            "ZEROCLAW_providers__models__custom__vision__api_key": vision.get("api_key"),
-            "OPENAI_API_KEY": vision.get("api_key"),
-            "OPENAI_BASE_URL": vision.get("base_url"),
-            "SHELL_TIMEOUT_SECS": runtime.get("shell_timeout_secs"),
-            "SHELL_TOOL_TIMEOUT_SECS": runtime.get("shell_tool_timeout_secs"),
-            "HEARTBEAT_ENABLED": heartbeat.get("enabled"),
-            "HEARTBEAT_INTERVAL_MINUTES": heartbeat.get("interval_minutes"),
-            "HEARTBEAT_TWO_PHASE": heartbeat.get("two_phase"),
-            "HEARTBEAT_MESSAGE": heartbeat.get("message"),
-            "HEARTBEAT_ADAPTIVE": heartbeat.get("adaptive"),
-            "HEARTBEAT_MIN_INTERVAL_MINUTES": heartbeat.get("min_interval_minutes"),
-            "HEARTBEAT_MAX_INTERVAL_MINUTES": heartbeat.get("max_interval_minutes"),
-            "HEARTBEAT_DEADMAN_TIMEOUT_MINUTES": heartbeat.get("deadman_timeout_minutes"),
-            "HEARTBEAT_MAX_RUN_HISTORY": heartbeat.get("max_run_history"),
-            "HEARTBEAT_LOAD_SESSION_CONTEXT": heartbeat.get("load_session_context"),
-            "HEARTBEAT_TASK_TIMEOUT_SECS": heartbeat.get("task_timeout_secs"),
-        }
-        for key, value in mapping.items():
-            if value is not None:
-                env[key] = env_value(value)
-
-        overrides = agent.get("environment")
-        if isinstance(overrides, dict):
-            for key, value in overrides.items():
-                if value is not None:
-                    env[str(key)] = env_value(value)
-        return env
 
     def create_container(self, spec: "ContainerSpec") -> dict[str, Any]:
         spec.instance_dir.mkdir(parents=True, exist_ok=True)
@@ -647,32 +569,6 @@ def safe_container_part(value: str) -> str:
 def stable_hash(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
-
-
-def env_value(value: Any) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (list, tuple, set)):
-        return ",".join(str(item) for item in value)
-    return str(value)
-
-
-def join_value(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, (list, tuple, set)):
-        return ",".join(str(item) for item in value)
-    return str(value)
-
-
-def deep_dict_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    result = dict(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = deep_dict_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
 
 
 def decode_docker_log_stream(body: bytes) -> str:

@@ -26,22 +26,114 @@ paths:
 defaults:
   zeroclaw_image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
   matrix:
+    homeserver: https://matrix.example.com
+    allowed_rooms:
+      - "!roomid:matrix.example.com"
     mention_only: false
+    interrupt_on_new_message: true
     reply_in_thread: true
     ack_reactions: true
     stream_mode: off
+    multi_message: false
+    multi_message_delay_ms: 800
+    channel_debounce_ms: 3000
 
-agents:
-  - name: agent1
-    enabled: true
-    host_port: 42641
-    model:
+vision:
+  model: gpt-4o
+  base_url: https://api.openai.com/v1
+  wire_api: chat_completions
+  allow_remote_fetch: false
+  max_images: 4
+  max_image_size_mb: 5
+  max_image_turns: 2
+
+heartbeat:
+  enabled: false
+  interval_minutes: 30
+  two_phase: true
+  message: ""
+  adaptive: false
+  min_interval_minutes: 5
+  max_interval_minutes: 120
+  deadman_timeout_minutes: 0
+  max_run_history: 100
+  load_session_context: false
+  task_timeout_secs: 600
+
+pacing:
+  loop_ignore_tools:
+    - home__job_status
+  loop_detection_enabled: true
+  loop_detection_window_size: 20
+  loop_detection_max_repeats: 3
+
+runtime:
+  shell_timeout_secs: 300
+  shell_tool_timeout_secs: 300
+
+profiles:
+  llm:
+    - id: deepseek-text
       provider_family: deepseek
       provider_alias: text
       model: deepseek-chat
       base_url: https://api.deepseek.com/v1
       wire_api: chat_completions
       timeout_secs: 120
+    - id: ollama-local
+      provider_family: ollama
+      provider_alias: local
+      model: qwen2.5:14b
+      base_url: http://host.docker.internal:11434
+      wire_api: chat_completions
+      timeout_secs: 600
+    - id: gemini-flash
+      provider_family: gemini
+      provider_alias: flash
+      model: gemini-2.5-flash
+      timeout_secs: 120
+  matrix:
+    - id: matrix-default
+      homeserver: https://matrix.example.com
+      allowed_rooms:
+        - "!roomid:matrix.example.com"
+      mention_only: false
+      interrupt_on_new_message: true
+      reply_in_thread: true
+      ack_reactions: true
+      stream_mode: off
+      multi_message: false
+      multi_message_delay_ms: 800
+      channel_debounce_ms: 3000
+  mcp:
+    - id: mcp-home
+      enabled: false
+      server_name: home
+      transport: sse
+      url: http://host.docker.internal:8787/mcp
+      deferred_loading: false
+      tool_timeout_secs: 120
+
+prompt_templates:
+  - id: default
+    name: Default workspace
+    files:
+      AGENTS.md: ""
+      IDENTITY.md: ""
+      SOUL.md: ""
+      MEMORY.md: ""
+      TOOLS.md: ""
+      USER.md: ""
+      HEARTBEAT.md: ""
+
+agents:
+  - name: agent1
+    enabled: true
+    host_port: 42641
+    llm_profile: deepseek-text
+    matrix_profile: matrix-default
+    mcp_profile: mcp-home
+    prompt_template: default
     matrix:
       user_id: "@agent1:matrix.example.com"
       device_id: ZEROCLAW_AGENT1
@@ -51,16 +143,26 @@ agents:
   - name: agent2
     enabled: true
     host_port: 42642
-    model:
-      provider_family: ollama
-      provider_alias: local
-      model: qwen2.5:14b
-      base_url: http://host.docker.internal:11434
-      wire_api: chat_completions
-      timeout_secs: 600
+    llm_profile: ollama-local
+    matrix_profile: matrix-default
+    mcp_profile: mcp-home
+    prompt_template: default
     matrix:
       user_id: "@agent2:matrix.example.com"
       device_id: ZEROCLAW_AGENT2
       external_peers:
         - "@you:matrix.example.com"
         - "#agent2-room:matrix.example.com"
+  - name: agent3
+    enabled: true
+    host_port: 42643
+    llm_profile: gemini-flash
+    matrix_profile: matrix-default
+    mcp_profile: mcp-home
+    prompt_template: default
+    matrix:
+      user_id: "@agent3:matrix.example.com"
+      device_id: ZEROCLAW_AGENT3
+      external_peers:
+        - "@you:matrix.example.com"
+        - "#agent3-room:matrix.example.com"

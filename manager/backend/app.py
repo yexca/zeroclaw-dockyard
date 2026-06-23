@@ -224,8 +224,22 @@ class ManagerHandler(BaseHTTPRequestHandler):
             if method == "POST" and action == "apply-template":
                 success(self, 200, STORE.apply_prompt_template(identifier, self.read_optional_json()))
                 return
+            if method == "POST" and action == "export":
+                payload = self.read_optional_json()
+                formats = payload.get("formats") if isinstance(payload, dict) and isinstance(payload.get("formats"), list) else None
+                success(self, 200, STORE.render_agent(identifier, formats=formats))
+                return
             if method == "POST" and action in {"start", "stop", "restart", "delete"}:
                 success(self, 202, getattr(DOCKER, action)(config, agent))
+                return
+            if method == "GET" and action == "env":
+                success(self, 200, STORE.render_agent(identifier, formats=["env"]))
+                return
+            if method == "GET" and action == "compose":
+                success(self, 200, STORE.render_agent(identifier, formats=["compose"]))
+                return
+            if method == "GET" and action in {"config-preview", "zeroclaw-config-preview"}:
+                success(self, 200, STORE.render_agent(identifier, formats=["zeroclaw_config_preview"]))
                 return
             if method == "GET" and action == "status":
                 success(self, 200, DOCKER.status(config, agent))

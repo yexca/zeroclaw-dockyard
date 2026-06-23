@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from manager.backend.agent_renderer import AgentRenderer, REQUIRED_ENV_KEYS
 from manager.backend.config_store import ConfigError, ConfigStore, redact
 from manager.backend.docker_controller import (
     AGENT_ID_LABEL,
@@ -175,6 +176,81 @@ class DockerControllerTest(unittest.TestCase):
         frame = b"\x01\x00\x00\x00" + (6).to_bytes(4, "big") + b"hello\n"
 
         self.assertEqual(decode_docker_log_stream(frame), "hello\n")
+
+
+class AgentRendererTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
+        self.renderer = AgentRenderer(self.root)
+        self.config = {
+            "paths": {"instances_dir": str(self.root / "instances")},
+            "docker": {"project_name": "zeroclaw-matrix-multi", "matrix_host_ip": "127.0.0.1"},
+            "defaults": {
+                "zeroclaw_image": "example/zeroclaw:test",
+                "matrix": {"homeserver": "https://matrix.example.com", "reply_in_thread": True},
+            },
+            "profiles": {
+                "llm": [
+                    {
+                        "id": "deepseek-text",
+                        "provider_family": "deepseek",
+                        "provider_alias": "text",
+                        "model": "deepseek-chat",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "wire_api": "chat_completions",
+                        "timeout_secs": 120,
+                    }
+                ],
+                "matrix": [{"id": "matrix-main", "mention_only": False}],
+                "mcp": [{"id": "mcp-home", "enabled": False, "server_name": "home"}],
+            },
+            "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello", "MEMORY.md": "memory"}}],
+        }
+        self.agent = {
+            "id": "agent1",
+            "name": "agent1",
+            "host_port": 42641,
+            "llm_profile": "deepseek-text",
+            "matrix_profile": "matrix-main",
+            "mcp_profile": "mcp-home",
+            "prompt_template": "default",
+            "matrix": {"user_id": "@agent1:matrix.example.com", "device_id": "ZEROCLAW_AGENT1"},
+        }
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_render_env_includes_required_variables(self) -> None:
+        env = self.renderer.render_env(self.config, self.agent)
+
+        for key in REQUIRED_ENV_KEYS:
+            self.assertIn(key, env)
+        self.assertEqual(env["BOT_NAME"], "agent1")
+        self.assertEqual(env["MODEL_PROVIDER_MODEL"], "deepseek-chat")
+        self.assertEqual(env["MATRIX_USER_ID"], "@agent1:matrix.example.com")
+
+    def test_workspace_keep_and_merge_modes_do_not_silently_overwrite(self) -> None:
+        first = self.renderer.initialize_workspace(self.config, self.agent, mode="overwrite")
+        workspace = Path(first["workspace"])
+        agents_file = workspace / "AGENTS.md"
+        agents_file.write_text("user edit", encoding="utf-8")
+
+        keep = self.renderer.initialize_workspace(self.config, self.agent, mode="keep")
+        merge = self.renderer.initialize_workspace(self.config, self.agent, mode="merge")
+
+        self.assertIn("AGENTS.md", keep["skipped"])
+        self.assertIn("AGENTS.md", merge["merged"])
+        self.assertIn("user edit", agents_file.read_text(encoding="utf-8"))
+        self.assertIn("ZeroClaw template merge", agents_file.read_text(encoding="utf-8"))
+
+    def test_export_agent_returns_env_compose_and_preview(self) -> None:
+        exported = self.renderer.export_agent(self.config, self.agent)
+
+        self.assertIn("env", exported["formats"])
+        self.assertIn("compose", exported["formats"])
+        self.assertIn("zeroclaw_config_preview", exported["formats"])
+        self.assertIn("schema_version = 3", exported["formats"]["zeroclaw_config_preview"])
 
 
 if __name__ == "__main__":

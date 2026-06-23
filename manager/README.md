@@ -24,6 +24,12 @@ mounts, loopback gateway port publishing, extra hosts, and the configured
 runtime network. Set `DOCKER_CONTROLLER=fake` to use the lightweight stub in
 tests or local UI-only development.
 
+Agent runtime rendering is centralized in `backend/agent_renderer.py`. The
+same resolver is used for Docker container environment variables, workspace
+template application, env exports, compose exports, and ZeroClaw
+`config.toml` previews. The existing `/bootstrap/render-config.sh` remains the
+runtime source of truth inside agent containers.
+
 The manager is intended to be reached only through the host loopback binding in
 `docker-compose.yml`.
 
@@ -80,6 +86,11 @@ Core endpoints:
 - `GET|POST /api/agents`
 - `GET|PUT|DELETE /api/agents/{id}`
 - `POST /api/agents/{id}/validate`
+- `POST /api/agents/{id}/apply-template`
+- `GET /api/agents/{id}/env`
+- `GET /api/agents/{id}/compose`
+- `GET /api/agents/{id}/config-preview`
+- `POST /api/agents/{id}/export`
 - `POST /api/agents/{id}/{start|stop|restart}`
 - `POST /api/agents/{id}/delete`
 - `GET /api/agents/{id}/{status|logs}`
@@ -89,6 +100,11 @@ Successful API responses use `{ "ok": true, "data": ... }`. Errors use
 `{ "ok": false, "error": { "code": "...", "message": "...", "details": {} } }`.
 Request-body logging redacts keys, tokens, passwords, recovery keys, and other
 secret-like fields.
+
+Workspace template application supports `keep`, `missing`, `overwrite`, and
+`merge` modes. Creating an agent attempts to initialize the selected template
+without overwriting existing files; explicit WebUI calls can choose a different
+mode.
 
 Run the frontend foundation checks with:
 
