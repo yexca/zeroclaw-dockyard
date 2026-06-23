@@ -69,6 +69,42 @@ The WebUI validates required strings, HTTP/HTTPS URLs, numeric fields, numeric
 ranges, and JSON text fields before saving. JSON fields are stored as structured
 YAML and rendered as TOML inline values for agent containers.
 
+## Matrix Profile Fields
+
+`profiles.matrix` entries describe reusable ZeroClaw Matrix channel settings.
+They are merged with `defaults.matrix` and each agent's `matrix` override.
+
+Common fields:
+
+- `id`: manager-local profile ID.
+- `homeserver`: Matrix homeserver URL. Required before a managed agent can run.
+- `user_id`: bot account MXID. Required for password login.
+- `device_id`: stable Matrix device ID. Useful for token-based E2EE sessions;
+  password login can usually leave it unset.
+- `password`: Matrix login password. Recommended together with `user_id`.
+- `recovery_key`: E2EE secure backup recovery key.
+- `access_token`: alternative token-based credential.
+- `allowed_rooms`: canonical Matrix room IDs accepted for inbound messages.
+- `mention_only`: in group rooms, respond only when the bot is mentioned.
+- `interrupt_on_new_message`: cancel in-flight work when a newer message arrives.
+- `reply_in_thread`: reply inside Matrix threads. Manager default: `false`.
+- `ack_reactions`: send processing/done reactions. Manager default: `true`.
+- `stream_mode`: `off`, `partial`, or `multi_message`. Manager default:
+  `multi_message`.
+- `multi_message_delay_ms`: delay between split paragraph messages. Default:
+  `800`.
+- `channel_debounce_ms`: rendered as `[channels].debounce_ms`. Default: `0`.
+
+Advanced fields supported by the manager include:
+
+- `draft_update_interval_ms`: edit interval for `partial` streaming. Default:
+  `1500`.
+- `approval_timeout_secs`: Matrix approval timeout. Manager default: `3600`.
+- `excluded_tools`: tool names hidden from the model for Matrix turns.
+- `reply_min_interval_secs`: outbound pacing floor. `0` disables pacing.
+- `reply_queue_depth_max`: outbound pacing queue depth.
+- `host_ip`: per-profile override for the `matrix-host` extra host IP.
+
 ## Secrets
 
 `config/secrets.yaml` may contain plaintext local secrets:

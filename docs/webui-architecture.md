@@ -35,6 +35,17 @@ The manager labels containers with `zeroclaw.manager=true`,
 `zeroclaw.agent.id`, `zeroclaw.agent.name`, and a spec hash. Runtime operations
 refuse to modify same-named containers without matching manager labels.
 
+## Frontend Startup Flow
+
+The frontend is static HTML, CSS, and browser ES modules. `index.html` includes
+a lightweight startup skeleton so the first paint is not blank while modules and
+API calls load.
+
+Startup applies the locally stored theme before loading CSS, initializes i18n,
+renders the shell, fetches `/api/config`, and then refreshes `/api/dashboard` in
+the background. This keeps the editor usable even when Docker status calls are
+slow or temporarily unavailable.
+
 ## Docker API Flow
 
 ```text

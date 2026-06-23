@@ -61,6 +61,49 @@ The frontend validates required strings, numeric ranges, URLs, and JSON fields
 before saving. Invalid fields are reported in a browser alert with the specific
 field name.
 
+## Matrix Profiles
+
+The Matrix Profiles view edits reusable Matrix channel profiles under
+`profiles.matrix`. Matrix values are resolved in this order:
+
+```text
+defaults.matrix -> profiles.matrix[] -> agents[].matrix
+```
+
+The profile form is split into core identity, common behavior, and advanced
+settings. Each text input uses placeholder text to explain the field, and field
+labels expose the same help text as a browser tooltip.
+
+Core fields:
+
+- `ID`: manager-local profile ID used by agents through `matrix_profile`.
+- `Homeserver`: required Matrix homeserver URL.
+- `Matrix user`: bot account MXID. Required for the recommended password login
+  path.
+- `Device ID`: stable Matrix device ID. Keep it stable for token-based E2EE
+  sessions; password login can usually leave it empty.
+- `Password`: recommended login credential when used with `Matrix user`.
+- `Recovery key`: recommended for E2EE rooms so ZeroClaw can restore room keys
+  and cross-sign the bot device.
+- `Allowed rooms`: canonical Matrix room IDs. Empty means all rooms the bot has
+  joined. Use `!room:server` IDs, not `#alias:server` aliases.
+
+Common behavior defaults:
+
+- `Reply in thread`: off.
+- `Stream mode`: `multi_message`.
+- `Multi-message delay ms`: `800`.
+- `Channel debounce ms`: `0`.
+
+`Access token` is available in the common behavior section for operators who
+must reuse an existing token. Prefer `Matrix user` + `Password` unless token
+reuse is required.
+
+Advanced settings include partial-stream draft interval, approval timeout,
+excluded tools, outbound pacing fields, and `host_ip` override. These settings
+are rendered into the generated ZeroClaw Matrix channel config for agent
+containers.
+
 ## Files
 
 Commit examples only:
