@@ -10,9 +10,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from config_store import ConfigError, ConfigStore, redact, to_json
-from docker_controller import DockerApiError, build_controller_from_env
-from observability import agent_identifier, enrich_status, history_from_env, redact_lines, redact_text, utc_now
+try:
+    from config_store import ConfigError, ConfigStore, redact, to_json
+    from docker_controller import DockerApiError, build_controller_from_env
+    from observability import agent_identifier, enrich_status, history_from_env, redact_lines, redact_text, utc_now
+except ModuleNotFoundError:  # pragma: no cover - package import path for tests
+    from .config_store import ConfigError, ConfigStore, redact, to_json
+    from .docker_controller import DockerApiError, build_controller_from_env
+    from .observability import agent_identifier, enrich_status, history_from_env, redact_lines, redact_text, utc_now
 
 
 APP_ROOT = Path(__file__).resolve().parents[1]

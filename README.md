@@ -1,19 +1,25 @@
 # ZeroClaw Multi Docker
 
-Docker Compose templates for running multiple ZeroClaw Matrix agents from one host.
+Docker Compose templates and a local WebUI manager for running multiple
+ZeroClaw Matrix agents from one host.
 
 This project uses the official ZeroClaw `v0.8.1-debian` image. The Debian image
 includes a shell and Matrix support, so this repository no longer builds or
 patches a local ZeroClaw image. It provides per-agent workspaces, per-agent
 model providers, optional vision routing, optional MCP gateway access, and an
-optional proactive wake-up sidecar.
+optional proactive wake-up sidecar. The WebUI manager is now the preferred
+control plane, while the legacy static Compose services remain available for
+manual troubleshooting.
 
 Chinese documentation is available in [README.zh-cn.md](README.zh-cn.md).
 
 ## What Is Included
 
-- `docker-compose.yml`: three example agents, `agent1`, `agent2`, and `agent3`, plus an optional proactive sidecar.
+- `docker-compose.yml`: local WebUI manager, Docker socket proxy, three example agents, `agent1`, `agent2`, and `agent3`, plus an optional proactive sidecar.
 - `.env.example`: public placeholder configuration for the official image, model providers, Matrix accounts, MCP, and proactive wake-ups.
+- `config/manager.example.yaml`: structured WebUI manager configuration.
+- `config/secrets.example.yaml`: local plaintext secrets template; copy it locally but do not commit real secrets.
+- `manager/`: WebUI backend and frontend.
 - `bootstrap/render-config.sh`: renders a ZeroClaw schema v3 `config.toml` inside each container.
 - `proactive/proactive.py`: optional sidecar that periodically POSTs wake prompts to each agent gateway.
 - `tools/add-agent.ps1`: PowerShell helper for adding more agent services.
@@ -66,7 +72,31 @@ Copy-Item templates\workspace\* instances\agent2\workspace\
 Copy-Item templates\workspace\* instances\agent3\workspace\
 ```
 
-## Run
+## Run The WebUI Manager
+
+For new setups, start the local WebUI manager:
+
+```powershell
+Copy-Item config\manager.example.yaml config\manager.yaml
+Copy-Item config\secrets.example.yaml config\secrets.yaml
+$env:PWD = (Get-Location).Path
+docker compose up -d manager
+```
+
+Open `http://127.0.0.1:7652`.
+
+The manager is bound to `127.0.0.1` and talks to Docker through
+`docker-socket-proxy`; it does not mount `/var/run/docker.sock` directly.
+
+Detailed docs:
+
+- [WebUI usage](docs/webui-usage.md)
+- [Configuration schema](docs/config-schema.md)
+- [Docker socket proxy security](docs/docker-socket-proxy-security.md)
+- [i18n and theme](docs/i18n-theme.md)
+- [Migration guide](docs/migration.md)
+
+## Run Legacy Static Agents
 
 ```powershell
 docker compose up -d agent1 agent2 agent3
@@ -77,6 +107,24 @@ Default gateway ports bind to localhost:
 - agent1: `http://127.0.0.1:42641`
 - agent2: `http://127.0.0.1:42642`
 - agent3: `http://127.0.0.1:42643`
+
+## Migrate From `.env`
+
+The migration tool reads `.env` and writes local YAML files without deleting or
+overwriting old files:
+
+```powershell
+python tools\migrate-env-to-manager.py --env .env
+```
+
+It creates `config/manager.local.yaml` and `config/secrets.local.yaml`. Review
+warnings, then copy them to the active paths when ready:
+
+```powershell
+Copy-Item config\manager.local.yaml config\manager.yaml
+Copy-Item config\secrets.local.yaml config\secrets.yaml
+docker compose up -d manager
+```
 
 ## Per-Agent Model Providers
 
@@ -207,6 +255,11 @@ The sidecar wakes each configured agent at randomized intervals by posting to
 Do not commit:
 
 - `.env`
+- `config/manager.yaml`
+- `config/secrets.yaml`
+- `config/manager.local.yaml`
+- `config/secrets.local.yaml`
+- `config/generated/*`
 - `instances/*/.zeroclaw/`
 - `instances/*/data/`
 - `instances/*/workspace/sessions/`
@@ -217,4 +270,20 @@ The included `.gitignore` covers these paths. Before publishing, run:
 
 ```powershell
 rg -n "api[_-]?key|token|password|recovery|secret|PRIVATE KEY|Bearer " .
+```
+
+## Tests And Release Checks
+
+Run the full local release check:
+
+```powershell
+.\tools\release-checks.ps1
+```
+
+Individual checks:
+
+```powershell
+docker compose config --quiet
+python -m unittest discover manager/backend/tests
+node manager/frontend/tests/ui-foundation.test.mjs
 ```

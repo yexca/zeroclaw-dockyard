@@ -26,6 +26,8 @@ const zhCN = await readJson("src/locales/zh-CN.json");
 assert.deepEqual(flattenKeys(zhCN).sort(), flattenKeys(en).sort(), "Locale files must expose the same keys");
 
 const themeCore = await import(pathToFileURL(resolve(frontendDir, "src/theme-core.mjs")));
+const i18n = await import(pathToFileURL(resolve(frontendDir, "src/i18n.mjs")));
+const preferences = await import(pathToFileURL(resolve(frontendDir, "src/preferences.mjs")));
 const documentElement = { dataset: {}, style: {} };
 const darkMedia = (query) => ({ matches: query === "(prefers-color-scheme: dark)" });
 
@@ -39,5 +41,17 @@ assert.equal(documentElement.dataset.theme, "dark");
 
 themeCore.applyThemeMode("light", { documentElement, matchMedia: darkMedia });
 assert.equal(documentElement.dataset.theme, "light", "Explicit light mode should override system");
+
+assert.equal(i18n.normalizeLocale("zh-Hans-CN"), "zh-CN", "Chinese locale should normalize to zh-CN");
+assert.equal(i18n.normalizeLocale("fr-FR"), "en", "Unsupported locales should fall back to English");
+assert.equal(themeCore.normalizeThemeMode("neon"), "system", "Unknown theme mode should fall back to system");
+
+const defaults = await preferences.loadDefaultPreferences(async () => ({
+  ok: true,
+  async json() {
+    return { data: { default_language: "zh-CN", default_theme: "dark" } };
+  }
+}));
+assert.deepEqual(defaults, { language: "zh-CN", theme: "dark" }, "WebUI defaults should load from API payload");
 
 console.log("ui foundation tests passed");

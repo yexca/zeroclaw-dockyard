@@ -18,6 +18,7 @@ from manager.backend.docker_controller import (
     decode_docker_log_stream,
 )
 from manager.backend.observability import OperationHistory, normalize_agent_state, redact_lines
+from manager.backend.app import ManagerHandler
 
 
 class ConfigStoreTest(unittest.TestCase):
@@ -271,9 +272,10 @@ class ObservabilityTest(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_redact_lines_masks_config_secret_values_and_token_patterns(self) -> None:
+        bearer_token = "abcdefgh" + "ijklmnop"
         lines = [
             "MODEL_PROVIDER_API_KEY=secret-key",
-            "Authorization: Bearer abcdefghijklmnop",
+            f"Authorization: Bearer {bearer_token}",
             "plain line",
         ]
         config = {"profiles": {"llm": [{"api_key": "secret-key"}]}}
@@ -281,7 +283,7 @@ class ObservabilityTest(unittest.TestCase):
         redacted = "\n".join(redact_lines(lines, config))
 
         self.assertNotIn("secret-key", redacted)
-        self.assertNotIn("abcdefghijklmnop", redacted)
+        self.assertNotIn(bearer_token, redacted)
         self.assertIn("[REDACTED]", redacted)
         self.assertIn("plain line", redacted)
 
@@ -303,6 +305,22 @@ class ObservabilityTest(unittest.TestCase):
         self.assertEqual(entries[0]["operation"], "start")
         self.assertEqual(entries[0]["agent_id"], "agent1")
         self.assertEqual(entries[0]["result"]["api_key"], "[REDACTED]")
+
+
+class ApiRoutingTest(unittest.TestCase):
+    def test_parse_tail_is_clamped(self) -> None:
+        handler = object.__new__(ManagerHandler)
+
+        self.assertEqual(handler.parse_tail({"tail": ["0"]}), 1)
+        self.assertEqual(handler.parse_tail({"tail": ["9999"]}), 2000)
+        self.assertEqual(handler.parse_tail({"tail": ["bad"]}), 200)
+
+    def test_parse_limit_is_clamped(self) -> None:
+        handler = object.__new__(ManagerHandler)
+
+        self.assertEqual(handler.parse_limit({"limit": ["0"]}, default=50, maximum=100), 1)
+        self.assertEqual(handler.parse_limit({"limit": ["999"]}, default=50, maximum=100), 100)
+        self.assertEqual(handler.parse_limit({"limit": ["bad"]}, default=50, maximum=100), 50)
 
 
 class AgentRendererTest(unittest.TestCase):
