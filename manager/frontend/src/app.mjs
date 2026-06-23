@@ -99,7 +99,8 @@ const state = {
   notice: "",
   error: "",
   exportResult: null,
-  validationResult: null
+  validationResult: null,
+  dashboardLoading: false
 };
 
 let i18n;
@@ -401,6 +402,20 @@ async function refreshDashboard() {
   }
 }
 
+async function refreshDashboardInBackground() {
+  state.dashboardLoading = true;
+  render();
+  try {
+    await refreshDashboard();
+    state.error = "";
+  } catch (error) {
+    state.error = error.message || String(error);
+  } finally {
+    state.dashboardLoading = false;
+    render();
+  }
+}
+
 function optionList(items, selected, emptyKey) {
   const empty = emptyKey ? `<option value="">${escapeHtml(t(emptyKey))}</option>` : "";
   return `${empty}${items
@@ -545,7 +560,8 @@ function render() {
 }
 
 function renderNotices() {
-  const loading = state.busy ? `<div class="notice muted">${escapeHtml(t("common.loading"))}</div>` : "";
+  const loading =
+    state.busy || state.dashboardLoading ? `<div class="notice muted">${escapeHtml(t("common.loading"))}</div>` : "";
   const notice = state.notice ? `<div class="notice success">${escapeHtml(state.notice)}</div>` : "";
   const error = state.error ? `<div class="notice danger">${escapeHtml(state.error)}</div>` : "";
   return `${loading}${notice}${error}`;
@@ -1363,9 +1379,9 @@ async function main() {
   });
 
   bindEvents();
-  await refreshConfig();
-  await refreshDashboard();
   render();
+  await refreshConfig();
+  refreshDashboardInBackground();
 }
 
 main().catch((error) => {

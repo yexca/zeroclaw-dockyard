@@ -203,6 +203,44 @@ textarea {
   gap: 16px;
 }
 
+.startup-nav span,
+.startup-line,
+.startup-grid div {
+  display: block;
+  border-radius: 6px;
+  background: var(--color-surface-soft);
+}
+
+.startup-nav span {
+  height: 39px;
+}
+
+.startup-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.startup-line {
+  height: 14px;
+  max-width: 560px;
+}
+
+.startup-line.title {
+  height: 26px;
+  max-width: 220px;
+}
+
+.startup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.startup-grid div {
+  min-height: 140px;
+  border: 1px solid var(--color-border-soft);
+}
+
 .side-nav,
 .content-panel,
 .agent-card,

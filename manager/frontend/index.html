@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title data-i18n="app.title">ZeroClaw Manager</title>
+    <script>
+      (() => {
+        try {
+          const storedMode = localStorage.getItem("zeroclaw.webui.theme") || "system";
+          const mode = ["light", "dark", "system"].includes(storedMode) ? storedMode : "system";
+          const resolved =
+            mode === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : mode === "system" ? "light" : mode;
+          document.documentElement.dataset.themeMode = mode;
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.style.colorScheme = resolved;
+        } catch (_error) {
+          document.documentElement.dataset.themeMode = "system";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -25,7 +40,25 @@
           </label>
         </div>
       </header>
-      <section id="app" class="workspace" aria-live="polite"></section>
+      <section id="app" class="workspace" aria-live="polite">
+        <div class="layout startup-layout" aria-busy="true">
+          <nav class="side-nav startup-nav" aria-label="Loading navigation">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </nav>
+          <section class="content-panel startup-panel">
+            <div class="startup-line title"></div>
+            <div class="startup-line"></div>
+            <div class="startup-grid">
+              <div></div>
+              <div></div>
+              <div></div>
+            </div>
+          </section>
+        </div>
+      </section>
     </main>
     <script type="module" src="/src/app.mjs"></script>
   </body>
