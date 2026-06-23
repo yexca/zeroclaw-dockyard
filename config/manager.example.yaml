@@ -76,7 +76,7 @@ profiles:
     - id: deepseek-text
       provider_family: deepseek
       provider_alias: text
-      model: deepseek-chat
+      model: deepseek-v4-flash
       base_url: https://api.deepseek.com/v1
       wire_api: chat_completions
       timeout_secs: 120

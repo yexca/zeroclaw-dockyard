@@ -157,6 +157,10 @@ p {
   font-weight: 700;
 }
 
+.required-mark {
+  color: var(--color-danger);
+}
+
 .inline-control {
   grid-template-columns: auto 88px;
   align-items: center;
@@ -230,11 +234,39 @@ textarea {
   text-align: left;
 }
 
+.list-item {
+  display: grid;
+  gap: 6px;
+}
+
+.list-item-main {
+  overflow-wrap: anywhere;
+}
+
+.list-tag {
+  justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-subtle);
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .nav-item:hover,
 .list-item:hover,
 .nav-item.active,
 .list-item.active {
   background: var(--color-surface-soft);
+  color: var(--color-primary);
+}
+
+.list-item:hover .list-tag,
+.list-item.active .list-tag {
+  border-color: currentColor;
   color: var(--color-primary);
 }
 
@@ -394,6 +426,19 @@ dd {
 
 .form-actions {
   margin-top: 16px;
+}
+
+.advanced-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-border-soft);
+  padding-top: 12px;
+}
+
+.advanced-panel summary {
+  cursor: pointer;
+  color: var(--color-text);
+  font-weight: 800;
+  margin-bottom: 12px;
 }
 
 .log-viewer,

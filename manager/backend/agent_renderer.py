@@ -26,6 +26,26 @@ REQUIRED_ENV_KEYS = [
     "MODEL_PROVIDER_WIRE_API",
     "MODEL_PROVIDER_TIMEOUT_SECS",
     "MODEL_PROVIDER_KIND",
+    "MODEL_PROVIDER_TEMPERATURE",
+    "MODEL_PROVIDER_MAX_TOKENS",
+    "MODEL_PROVIDER_REQUIRES_OPENAI_AUTH",
+    "MODEL_PROVIDER_FALLBACK",
+    "MODEL_PROVIDER_FALLBACK_MODELS",
+    "MODEL_PROVIDER_EXTRA_HEADERS",
+    "MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER",
+    "MODEL_PROVIDER_PROVIDER_EXTRA",
+    "MODEL_PROVIDER_PRICING",
+    "MODEL_PROVIDER_NATIVE_TOOLS",
+    "MODEL_PROVIDER_THINK",
+    "MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS",
+    "MODEL_PROVIDER_TLS_CA_CERT_PATH",
+    "MODEL_PROVIDER_AUTH_MODE",
+    "MODEL_PROVIDER_OAUTH_CLIENT_ID",
+    "MODEL_PROVIDER_OAUTH_CLIENT_SECRET",
+    "MODEL_PROVIDER_OAUTH_PROJECT",
+    "MODEL_PROVIDER_NUM_CTX",
+    "MODEL_PROVIDER_NUM_PREDICT",
+    "MODEL_PROVIDER_TEMPERATURE_OVERRIDE",
     "MATRIX_HOMESERVER",
     "MATRIX_HOST_IP",
     "MATRIX_USER_ID",
@@ -95,6 +115,26 @@ class AgentRenderer:
             "MODEL_PROVIDER_WIRE_API": env_value(model.get("wire_api") or ""),
             "MODEL_PROVIDER_TIMEOUT_SECS": env_value(model.get("timeout_secs") or 120),
             "MODEL_PROVIDER_KIND": env_value(model.get("kind") or ""),
+            "MODEL_PROVIDER_TEMPERATURE": env_value(model.get("temperature") if model.get("temperature") is not None else ""),
+            "MODEL_PROVIDER_MAX_TOKENS": env_value(model.get("max_tokens") if model.get("max_tokens") is not None else ""),
+            "MODEL_PROVIDER_REQUIRES_OPENAI_AUTH": env_value(model.get("requires_openai_auth", False)),
+            "MODEL_PROVIDER_FALLBACK": toml_inline_env(model.get("fallback") or []),
+            "MODEL_PROVIDER_FALLBACK_MODELS": toml_inline_env(model.get("fallback_models") or []),
+            "MODEL_PROVIDER_EXTRA_HEADERS": toml_inline_env(model.get("extra_headers") or {}),
+            "MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER": env_value(model.get("merge_system_into_user", False)),
+            "MODEL_PROVIDER_PROVIDER_EXTRA": toml_inline_env(model.get("provider_extra")),
+            "MODEL_PROVIDER_PRICING": toml_inline_env(model.get("pricing") or {}),
+            "MODEL_PROVIDER_NATIVE_TOOLS": env_value(model.get("native_tools") if model.get("native_tools") is not None else ""),
+            "MODEL_PROVIDER_THINK": env_value(model.get("think") if model.get("think") is not None else ""),
+            "MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS": toml_inline_env(model.get("chat_template_kwargs")),
+            "MODEL_PROVIDER_TLS_CA_CERT_PATH": env_value(model.get("tls_ca_cert_path") or ""),
+            "MODEL_PROVIDER_AUTH_MODE": env_value(model.get("auth_mode") or ""),
+            "MODEL_PROVIDER_OAUTH_CLIENT_ID": env_value(model.get("oauth_client_id") or ""),
+            "MODEL_PROVIDER_OAUTH_CLIENT_SECRET": env_value(model.get("oauth_client_secret") or ""),
+            "MODEL_PROVIDER_OAUTH_PROJECT": env_value(model.get("oauth_project") or ""),
+            "MODEL_PROVIDER_NUM_CTX": env_value(model.get("num_ctx") if model.get("num_ctx") is not None else ""),
+            "MODEL_PROVIDER_NUM_PREDICT": env_value(model.get("num_predict") if model.get("num_predict") is not None else ""),
+            "MODEL_PROVIDER_TEMPERATURE_OVERRIDE": env_value(model.get("temperature_override") if model.get("temperature_override") is not None else ""),
             "MATRIX_HOMESERVER": env_value(matrix.get("homeserver") or ""),
             "MATRIX_HOST_IP": env_value(matrix.get("host_ip") or docker_config.get("matrix_host_ip") or "127.0.0.1"),
             "MATRIX_USER_ID": env_value(matrix.get("user_id") or resolved.get("matrix_user_id") or ""),
@@ -313,6 +353,7 @@ def is_secret_key(key: str) -> bool:
 
 def render_config_toml_preview(env: dict[str, str]) -> str:
     provider_ref = f"{env.get('MODEL_PROVIDER_FAMILY', 'deepseek')}.{env.get('MODEL_PROVIDER_ALIAS', 'text')}"
+    provider_block = render_provider_toml_lines(env)
     return f"""schema_version = 3
 workspace_dir = "{toml_escape(env.get('ZEROCLAW_AGENT_WORKSPACE', '/zeroclaw-data/workspace'))}"
 config_path = "{toml_escape(env.get('ZEROCLAW_CONFIG_DIR', '/zeroclaw-data/.zeroclaw'))}/config.toml"
@@ -320,11 +361,7 @@ default_model_provider = "{toml_escape(provider_ref)}"
 default_model = "{toml_escape(env.get('MODEL_PROVIDER_MODEL', 'deepseek-chat'))}"
 
 [providers.models.{env.get('MODEL_PROVIDER_FAMILY', 'deepseek')}.{env.get('MODEL_PROVIDER_ALIAS', 'text')}]
-model = "{toml_escape(env.get('MODEL_PROVIDER_MODEL', 'deepseek-chat'))}"
-uri = "{toml_escape(env.get('MODEL_PROVIDER_BASE_URL', ''))}"
-wire_api = "{toml_escape(env.get('MODEL_PROVIDER_WIRE_API', ''))}"
-kind = "{toml_escape(env.get('MODEL_PROVIDER_KIND', ''))}"
-timeout_secs = {env.get('MODEL_PROVIDER_TIMEOUT_SECS', '120')}
+{provider_block}
 
 [channels.matrix.home]
 enabled = true
@@ -373,6 +410,79 @@ def env_value(value: Any) -> str:
     if isinstance(value, (list, tuple, set)):
         return ",".join(str(item) for item in value)
     return str(value)
+
+
+def toml_inline_env(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    return toml_inline(value)
+
+
+def render_provider_toml_lines(env: dict[str, str]) -> str:
+    lines = [
+        f'model = "{toml_escape(env.get("MODEL_PROVIDER_MODEL", "deepseek-chat"))}"',
+    ]
+    if env.get("MODEL_PROVIDER_BASE_URL"):
+        lines.append(f'uri = "{toml_escape(env.get("MODEL_PROVIDER_BASE_URL", ""))}"')
+    if env.get("MODEL_PROVIDER_API_KEY"):
+        lines.append(f'api_key = "{toml_escape(env.get("MODEL_PROVIDER_API_KEY", ""))}"')
+    if env.get("MODEL_PROVIDER_WIRE_API"):
+        lines.append(f'wire_api = "{toml_escape(env.get("MODEL_PROVIDER_WIRE_API", ""))}"')
+    if env.get("MODEL_PROVIDER_KIND"):
+        lines.append(f'kind = "{toml_escape(env.get("MODEL_PROVIDER_KIND", ""))}"')
+    lines.append(f'timeout_secs = {env.get("MODEL_PROVIDER_TIMEOUT_SECS", "120")}')
+
+    string_fields = {
+        "tls_ca_cert_path": "MODEL_PROVIDER_TLS_CA_CERT_PATH",
+        "auth_mode": "MODEL_PROVIDER_AUTH_MODE",
+        "oauth_client_id": "MODEL_PROVIDER_OAUTH_CLIENT_ID",
+        "oauth_client_secret": "MODEL_PROVIDER_OAUTH_CLIENT_SECRET",
+        "oauth_project": "MODEL_PROVIDER_OAUTH_PROJECT",
+    }
+    raw_fields = {
+        "temperature": "MODEL_PROVIDER_TEMPERATURE",
+        "max_tokens": "MODEL_PROVIDER_MAX_TOKENS",
+        "fallback": "MODEL_PROVIDER_FALLBACK",
+        "fallback_models": "MODEL_PROVIDER_FALLBACK_MODELS",
+        "extra_headers": "MODEL_PROVIDER_EXTRA_HEADERS",
+        "provider_extra": "MODEL_PROVIDER_PROVIDER_EXTRA",
+        "pricing": "MODEL_PROVIDER_PRICING",
+        "chat_template_kwargs": "MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS",
+        "num_ctx": "MODEL_PROVIDER_NUM_CTX",
+        "num_predict": "MODEL_PROVIDER_NUM_PREDICT",
+        "temperature_override": "MODEL_PROVIDER_TEMPERATURE_OVERRIDE",
+    }
+    bool_fields = {
+        "requires_openai_auth": "MODEL_PROVIDER_REQUIRES_OPENAI_AUTH",
+        "merge_system_into_user": "MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER",
+        "native_tools": "MODEL_PROVIDER_NATIVE_TOOLS",
+        "think": "MODEL_PROVIDER_THINK",
+    }
+    for key, env_key in string_fields.items():
+        if env.get(env_key):
+            lines.append(f'{key} = "{toml_escape(env.get(env_key, ""))}"')
+    for key, env_key in raw_fields.items():
+        if env.get(env_key):
+            lines.append(f"{key} = {env[env_key]}")
+    for key, env_key in bool_fields.items():
+        value = env.get(env_key, "")
+        if value and (key in {"native_tools", "think"} or toml_bool(value) == "true"):
+            lines.append(f"{key} = {toml_bool(value)}")
+    return "\n".join(lines)
+
+
+def toml_inline(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return f'"{toml_escape(value)}"'
+    if isinstance(value, (list, tuple, set)):
+        return "[" + ", ".join(toml_inline(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f'"{toml_escape(str(key))}" = {toml_inline(child)}' for key, child in value.items()) + " }"
+    return f'"{toml_escape(str(value))}"'
 
 
 def join_value(value: Any) -> str:

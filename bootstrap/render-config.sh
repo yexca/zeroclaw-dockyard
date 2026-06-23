@@ -125,6 +125,26 @@ MODEL_PROVIDER_API_KEY=$(first_nonempty "${MODEL_PROVIDER_API_KEY:-}" "${ZEROCLA
 MODEL_PROVIDER_WIRE_API=$(first_nonempty "${MODEL_PROVIDER_WIRE_API:-}" "${DEEPSEEK_WIRE_API:-}")
 MODEL_PROVIDER_TIMEOUT_SECS=$(first_nonempty "${MODEL_PROVIDER_TIMEOUT_SECS:-}" "120")
 MODEL_PROVIDER_KIND=$(first_nonempty "${MODEL_PROVIDER_KIND:-}" "")
+MODEL_PROVIDER_TEMPERATURE=$(first_nonempty "${MODEL_PROVIDER_TEMPERATURE:-}" "")
+MODEL_PROVIDER_MAX_TOKENS=$(first_nonempty "${MODEL_PROVIDER_MAX_TOKENS:-}" "")
+MODEL_PROVIDER_REQUIRES_OPENAI_AUTH=$(first_nonempty "${MODEL_PROVIDER_REQUIRES_OPENAI_AUTH:-}" "false")
+MODEL_PROVIDER_FALLBACK=$(first_nonempty "${MODEL_PROVIDER_FALLBACK:-}" "")
+MODEL_PROVIDER_FALLBACK_MODELS=$(first_nonempty "${MODEL_PROVIDER_FALLBACK_MODELS:-}" "")
+MODEL_PROVIDER_EXTRA_HEADERS=$(first_nonempty "${MODEL_PROVIDER_EXTRA_HEADERS:-}" "")
+MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER=$(first_nonempty "${MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER:-}" "false")
+MODEL_PROVIDER_PROVIDER_EXTRA=$(first_nonempty "${MODEL_PROVIDER_PROVIDER_EXTRA:-}" "")
+MODEL_PROVIDER_PRICING=$(first_nonempty "${MODEL_PROVIDER_PRICING:-}" "")
+MODEL_PROVIDER_NATIVE_TOOLS=$(first_nonempty "${MODEL_PROVIDER_NATIVE_TOOLS:-}" "")
+MODEL_PROVIDER_THINK=$(first_nonempty "${MODEL_PROVIDER_THINK:-}" "")
+MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS=$(first_nonempty "${MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS:-}" "")
+MODEL_PROVIDER_TLS_CA_CERT_PATH=$(first_nonempty "${MODEL_PROVIDER_TLS_CA_CERT_PATH:-}" "")
+MODEL_PROVIDER_AUTH_MODE=$(first_nonempty "${MODEL_PROVIDER_AUTH_MODE:-}" "")
+MODEL_PROVIDER_OAUTH_CLIENT_ID=$(first_nonempty "${MODEL_PROVIDER_OAUTH_CLIENT_ID:-}" "")
+MODEL_PROVIDER_OAUTH_CLIENT_SECRET=$(first_nonempty "${MODEL_PROVIDER_OAUTH_CLIENT_SECRET:-}" "")
+MODEL_PROVIDER_OAUTH_PROJECT=$(first_nonempty "${MODEL_PROVIDER_OAUTH_PROJECT:-}" "")
+MODEL_PROVIDER_NUM_CTX=$(first_nonempty "${MODEL_PROVIDER_NUM_CTX:-}" "")
+MODEL_PROVIDER_NUM_PREDICT=$(first_nonempty "${MODEL_PROVIDER_NUM_PREDICT:-}" "")
+MODEL_PROVIDER_TEMPERATURE_OVERRIDE=$(first_nonempty "${MODEL_PROVIDER_TEMPERATURE_OVERRIDE:-}" "")
 MODEL_PROVIDER_REF="${MODEL_PROVIDER_FAMILY}.${MODEL_PROVIDER_ALIAS}"
 SHELL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TIMEOUT_SECS:-}" "300")
 SHELL_TOOL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TOOL_TIMEOUT_SECS:-}" "$SHELL_TIMEOUT_SECS")
@@ -132,6 +152,8 @@ SHELL_TOOL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TOOL_TIMEOUT_SECS:-}" "$SHELL_
 validate_provider_segment "MODEL_PROVIDER_FAMILY" "$MODEL_PROVIDER_FAMILY"
 validate_provider_segment "MODEL_PROVIDER_ALIAS" "$MODEL_PROVIDER_ALIAS"
 validate_unsigned_int "MODEL_PROVIDER_TIMEOUT_SECS" "$MODEL_PROVIDER_TIMEOUT_SECS"
+if [ -n "$MODEL_PROVIDER_MAX_TOKENS" ]; then validate_unsigned_int "MODEL_PROVIDER_MAX_TOKENS" "$MODEL_PROVIDER_MAX_TOKENS"; fi
+if [ -n "$MODEL_PROVIDER_NUM_CTX" ]; then validate_unsigned_int "MODEL_PROVIDER_NUM_CTX" "$MODEL_PROVIDER_NUM_CTX"; fi
 validate_unsigned_int "SHELL_TIMEOUT_SECS" "$SHELL_TIMEOUT_SECS"
 validate_unsigned_int "SHELL_TOOL_TIMEOUT_SECS" "$SHELL_TOOL_TIMEOUT_SECS"
 
@@ -153,6 +175,26 @@ EOF
     printf 'kind = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_KIND")"
   fi
   printf 'timeout_secs = %s\n' "$MODEL_PROVIDER_TIMEOUT_SECS"
+  if [ -n "$MODEL_PROVIDER_TEMPERATURE" ]; then printf 'temperature = %s\n' "$MODEL_PROVIDER_TEMPERATURE"; fi
+  if [ -n "$MODEL_PROVIDER_MAX_TOKENS" ]; then printf 'max_tokens = %s\n' "$MODEL_PROVIDER_MAX_TOKENS"; fi
+  if [ "$(toml_bool "$MODEL_PROVIDER_REQUIRES_OPENAI_AUTH")" = "true" ]; then printf 'requires_openai_auth = true\n'; fi
+  if [ -n "$MODEL_PROVIDER_FALLBACK" ]; then printf 'fallback = %s\n' "$MODEL_PROVIDER_FALLBACK"; fi
+  if [ -n "$MODEL_PROVIDER_FALLBACK_MODELS" ]; then printf 'fallback_models = %s\n' "$MODEL_PROVIDER_FALLBACK_MODELS"; fi
+  if [ -n "$MODEL_PROVIDER_EXTRA_HEADERS" ]; then printf 'extra_headers = %s\n' "$MODEL_PROVIDER_EXTRA_HEADERS"; fi
+  if [ "$(toml_bool "$MODEL_PROVIDER_MERGE_SYSTEM_INTO_USER")" = "true" ]; then printf 'merge_system_into_user = true\n'; fi
+  if [ -n "$MODEL_PROVIDER_PROVIDER_EXTRA" ]; then printf 'provider_extra = %s\n' "$MODEL_PROVIDER_PROVIDER_EXTRA"; fi
+  if [ -n "$MODEL_PROVIDER_PRICING" ]; then printf 'pricing = %s\n' "$MODEL_PROVIDER_PRICING"; fi
+  if [ -n "$MODEL_PROVIDER_NATIVE_TOOLS" ]; then printf 'native_tools = %s\n' "$(toml_bool "$MODEL_PROVIDER_NATIVE_TOOLS")"; fi
+  if [ -n "$MODEL_PROVIDER_THINK" ]; then printf 'think = %s\n' "$(toml_bool "$MODEL_PROVIDER_THINK")"; fi
+  if [ -n "$MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS" ]; then printf 'chat_template_kwargs = %s\n' "$MODEL_PROVIDER_CHAT_TEMPLATE_KWARGS"; fi
+  if [ -n "$MODEL_PROVIDER_TLS_CA_CERT_PATH" ]; then printf 'tls_ca_cert_path = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_TLS_CA_CERT_PATH")"; fi
+  if [ -n "$MODEL_PROVIDER_AUTH_MODE" ]; then printf 'auth_mode = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_AUTH_MODE")"; fi
+  if [ -n "$MODEL_PROVIDER_OAUTH_CLIENT_ID" ]; then printf 'oauth_client_id = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_OAUTH_CLIENT_ID")"; fi
+  if [ -n "$MODEL_PROVIDER_OAUTH_CLIENT_SECRET" ]; then printf 'oauth_client_secret = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_OAUTH_CLIENT_SECRET")"; fi
+  if [ -n "$MODEL_PROVIDER_OAUTH_PROJECT" ]; then printf 'oauth_project = "%s"\n' "$(toml_escape "$MODEL_PROVIDER_OAUTH_PROJECT")"; fi
+  if [ -n "$MODEL_PROVIDER_NUM_CTX" ]; then printf 'num_ctx = %s\n' "$MODEL_PROVIDER_NUM_CTX"; fi
+  if [ -n "$MODEL_PROVIDER_NUM_PREDICT" ]; then printf 'num_predict = %s\n' "$MODEL_PROVIDER_NUM_PREDICT"; fi
+  if [ -n "$MODEL_PROVIDER_TEMPERATURE_OVERRIDE" ]; then printf 'temperature_override = %s\n' "$MODEL_PROVIDER_TEMPERATURE_OVERRIDE"; fi
 }
 
 write_mcp_block() {

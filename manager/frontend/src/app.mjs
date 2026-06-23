@@ -1,10 +1,88 @@
-import { createI18n } from "./i18n.mjs";
+﻿import { createI18n } from "./i18n.mjs";
 import { loadDefaultPreferences, readPreference, STORAGE_KEYS } from "./preferences.mjs";
 import { createThemeController } from "./theme.mjs";
 
 const TEMPLATE_FILES = ["AGENTS.md", "IDENTITY.md", "SOUL.md", "MEMORY.md", "TOOLS.md", "USER.md", "HEARTBEAT.md"];
 const TABS = ["dashboard", "agents", "llm", "matrix", "mcp", "prompts", "export"];
 const SECRET_KEYS = ["api_key", "token", "password", "recovery_key", "secret"];
+const LLM_PRESETS = {
+  openai: {
+    label: "OpenAI",
+    provider_family: "openai",
+    provider_alias: "default",
+    model: "gpt-5.4",
+    base_url: "https://api.openai.com/v1",
+    wire_api: "chat_completions",
+    timeout_secs: 120
+  },
+  deepseek: {
+    label: "DeepSeek",
+    provider_family: "deepseek",
+    provider_alias: "text",
+    model: "deepseek-v4-flash",
+    base_url: "https://api.deepseek.com/v1",
+    wire_api: "chat_completions",
+    timeout_secs: 120
+  },
+  ollama: {
+    label: "Ollama",
+    provider_family: "ollama",
+    provider_alias: "local",
+    model: "qwen2.5:14b",
+    base_url: "http://host.docker.internal:11434",
+    wire_api: "chat_completions",
+    timeout_secs: 600
+  },
+  gemini: {
+    label: "Gemini",
+    provider_family: "gemini",
+    provider_alias: "flash",
+    model: "gemini-2.5-flash",
+    base_url: "https://generativelanguage.googleapis.com/v1beta",
+    wire_api: "chat_completions",
+    timeout_secs: 120
+  },
+  custom: {
+    label: "OpenAI-compatible",
+    provider_family: "custom",
+    provider_alias: "compatible",
+    model: "model-id",
+    base_url: "https://api.example.com/v1",
+    wire_api: "chat_completions",
+    timeout_secs: 120
+  }
+};
+const LLM_PROVIDER_FIELDS = [
+  "provider_family",
+  "provider_alias",
+  "model",
+  "base_url",
+  "wire_api",
+  "timeout_secs"
+];
+const LLM_ADVANCED_FIELDS = [
+  "kind",
+  "temperature",
+  "max_tokens",
+  "requires_openai_auth",
+  "fallback",
+  "fallback_models",
+  "extra_headers",
+  "merge_system_into_user",
+  "provider_extra",
+  "pricing",
+  "native_tools",
+  "think",
+  "chat_template_kwargs",
+  "tls_ca_cert_path",
+  "auth_mode",
+  "oauth_client_id",
+  "oauth_client_secret",
+  "oauth_project",
+  "num_ctx",
+  "num_predict",
+  "temperature_override"
+];
 
 const state = {
   config: null,
@@ -26,6 +104,14 @@ const state = {
 
 let i18n;
 let themeController;
+
+class FormValidationError extends Error {
+  constructor(message, fieldName = "") {
+    super(message);
+    this.name = "FormValidationError";
+    this.fieldName = fieldName;
+  }
+}
 
 function t(key) {
   return i18n.t(key);
@@ -107,9 +193,149 @@ function parseNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseOptionalNumber(value, fieldName = "", options = {}) {
+  const text = String(value ?? "").trim();
+  if (!text) return undefined;
+  const parsed = Number.parseInt(text, 10);
+  if (!Number.isFinite(parsed) || String(parsed) !== text) {
+    throw new FormValidationError(t("messages.invalidNumberField").replace("{field}", fieldName || t("common.unknown")), fieldName);
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    throw new FormValidationError(
+      t("messages.invalidMinNumberField").replace("{field}", fieldName || t("common.unknown")).replace("{min}", String(options.min)),
+      fieldName
+    );
+  }
+  if (options.max !== undefined && parsed > options.max) {
+    throw new FormValidationError(
+      t("messages.invalidMaxNumberField").replace("{field}", fieldName || t("common.unknown")).replace("{max}", String(options.max)),
+      fieldName
+    );
+  }
+  return parsed;
+}
+
+function parseOptionalFloat(value, fieldName = "", options = {}) {
+  const text = String(value ?? "").trim();
+  if (!text) return undefined;
+  const parsed = Number.parseFloat(text);
+  if (!Number.isFinite(parsed) || !/^-?\d+(\.\d+)?$/.test(text)) {
+    throw new FormValidationError(t("messages.invalidNumberField").replace("{field}", fieldName || t("common.unknown")), fieldName);
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    throw new FormValidationError(
+      t("messages.invalidMinNumberField").replace("{field}", fieldName || t("common.unknown")).replace("{min}", String(options.min)),
+      fieldName
+    );
+  }
+  if (options.max !== undefined && parsed > options.max) {
+    throw new FormValidationError(
+      t("messages.invalidMaxNumberField").replace("{field}", fieldName || t("common.unknown")).replace("{max}", String(options.max)),
+      fieldName
+    );
+  }
+  return parsed;
+}
+
+function parseOptionalBoolean(value) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
+
 function parseJson(value, fallback = {}) {
   if (!value.trim()) return fallback;
   return JSON.parse(value);
+}
+
+function fieldDisplayName(name) {
+  const labels = {
+    overrides: t("fields.overrides"),
+    id: t("fields.id"),
+    name: t("fields.name"),
+    host_port: t("fields.hostPort"),
+    provider_family: t("fields.provider"),
+    provider_alias: t("fields.providerAlias"),
+    base_url: t("fields.baseUrl"),
+    model: t("fields.model"),
+    wire_api: t("fields.wireApi"),
+    timeout_secs: t("fields.timeout"),
+    temperature: t("fields.temperature"),
+    max_tokens: t("fields.maxTokens"),
+    extra_headers: t("fields.extraHeaders"),
+    provider_extra: t("fields.providerExtra"),
+    pricing: t("fields.pricing"),
+    chat_template_kwargs: t("fields.chatTemplateKwargs"),
+    tls_ca_cert_path: t("fields.tlsCaCertPath"),
+    oauth_project: t("fields.oauthProject"),
+    num_ctx: t("fields.numCtx"),
+    num_predict: t("fields.numPredict"),
+    temperature_override: t("fields.temperatureOverride"),
+    homeserver: t("fields.homeserver"),
+    stream_mode: t("fields.streamMode"),
+    server_name: t("fields.serverName"),
+    transport: t("fields.transport"),
+    url: t("fields.url")
+  };
+  return labels[name] || name;
+}
+
+function readJsonField(data, key, fallback) {
+  const raw = String(data.get(key) || "");
+  if (!raw.trim()) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new FormValidationError(t("messages.invalidJsonField").replace("{field}", fieldDisplayName(key)), key);
+  }
+}
+
+function requireString(data, key) {
+  const value = String(data.get(key) || "").trim();
+  if (!value) {
+    throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName(key)), key);
+  }
+  return value;
+}
+
+function requireNumber(data, key, options = {}) {
+  const value = parseOptionalNumber(data.get(key), fieldDisplayName(key), options);
+  if (value === undefined) {
+    throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName(key)), key);
+  }
+  return value;
+}
+
+function validateUrlLike(value, key, { required = false } = {}) {
+  const text = String(value || "").trim();
+  if (!text) {
+    if (required) throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName(key)), key);
+    return text;
+  }
+  try {
+    const url = new URL(text);
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("unsupported protocol");
+  } catch {
+    throw new FormValidationError(t("messages.invalidUrlField").replace("{field}", fieldDisplayName(key)), key);
+  }
+  return text;
+}
+
+function alertValidation(error) {
+  window.alert(error.message || String(error));
+}
+
+function cleanEmptyValues(value) {
+  if (Array.isArray(value)) return value.map(cleanEmptyValues);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([key, child]) => [key, cleanEmptyValues(child)])
+        .filter(([, child]) => child !== undefined && child !== "" && !(Array.isArray(child) && child.length === 0))
+        .filter(([, child]) => !(child && typeof child === "object" && !Array.isArray(child) && Object.keys(child).length === 0))
+    );
+  }
+  return value;
 }
 
 async function api(path, options = {}) {
@@ -185,8 +411,81 @@ function optionList(items, selected, emptyKey) {
     .join("")}`;
 }
 
+function optionsFromPairs(items, selected) {
+  return items
+    .map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(label)}</option>`)
+    .join("");
+}
+
+function llmProviderOptions(selected) {
+  return optionsFromPairs(
+    Object.values(LLM_PRESETS).map((preset) => [preset.provider_family, preset.label]),
+    selected
+  );
+}
+
+function wireApiOptions(selected) {
+  return optionsFromPairs(
+    [
+      ["chat_completions", "chat_completions"],
+      ["responses", "responses"]
+    ],
+    selected
+  );
+}
+
+function authModeOptions(selected) {
+  return optionsFromPairs(
+    [
+      ["", t("common.none")],
+      ["api_key", "api_key"],
+      ["oauth", "oauth"]
+    ],
+    selected
+  );
+}
+
+function booleanOptions(selected) {
+  const value = selected === true ? "true" : selected === false ? "false" : "";
+  return optionsFromPairs(
+    [
+      ["", t("common.none")],
+      ["true", t("common.yes")],
+      ["false", t("common.no")]
+    ],
+    value
+  );
+}
+
+function llmFamily(item) {
+  return item.provider_family || item.family || item.kind || "openai";
+}
+
+function createLlmProfile(id) {
+  return { id, ...LLM_PRESETS.openai, _draft: true };
+}
+
+function applyLlmPresetToEmptyFields(item, family) {
+  const preset = LLM_PRESETS[family] || LLM_PRESETS.openai;
+  const next = { ...item, provider_family: preset.provider_family };
+  for (const key of LLM_PROVIDER_FIELDS) {
+    if (key === "provider_family") continue;
+    if (next[key] === undefined || next[key] === null || next[key] === "") next[key] = preset[key];
+  }
+  return next;
+}
+
+function isProviderVisible(item, families) {
+  return families.includes(llmFamily(item));
+}
+
+function labelText(labelKey, attrs = "") {
+  const required = /\brequired\b/.test(attrs);
+  return `<span>${escapeHtml(t(labelKey))}${required ? ' <b class="required-mark">*</b>' : ""}</span>`;
+}
+
 function field(labelKey, name, value = "", attrs = "") {
-  return `<label class="field"><span>${escapeHtml(t(labelKey))}</span><input name="${name}" value="${escapeHtml(
+  return `<label class="field">${labelText(labelKey, attrs)}<input name="${name}" value="${escapeHtml(
     value
   )}" ${attrs} /></label>`;
 }
@@ -196,7 +495,7 @@ function passwordField(labelKey, name, value = "") {
 }
 
 function textareaField(labelKey, name, value = "", attrs = "") {
-  return `<label class="field field-wide"><span>${escapeHtml(t(labelKey))}</span><textarea name="${name}" ${attrs}>${escapeHtml(
+  return `<label class="field field-wide">${labelText(labelKey, attrs)}<textarea name="${name}" ${attrs}>${escapeHtml(
     value
   )}</textarea></label>`;
 }
@@ -217,8 +516,8 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
-function selectField(labelKey, name, optionsHtml) {
-  return `<label class="field"><span>${escapeHtml(t(labelKey))}</span><select name="${name}">${optionsHtml}</select></label>`;
+function selectField(labelKey, name, optionsHtml, attrs = "") {
+  return `<label class="field">${labelText(labelKey, attrs)}<select name="${name}" ${attrs}>${optionsHtml}</select></label>`;
 }
 
 function actionButton(action, labelKey, variant = "secondary", disabled = false) {
@@ -389,9 +688,10 @@ function renderItemList(kind, items, selectedId) {
   return items
     .map((item) => {
       const id = itemId(item);
+      const modelTag = kind === "llm" && item.model ? `<span class="list-tag">${escapeHtml(item.model)}</span>` : "";
       return `<button type="button" class="list-item ${id === selectedId ? "active" : ""}" data-select-${kind}="${escapeHtml(
         id
-      )}">${escapeHtml(id)}</button>`;
+      )}"><span class="list-item-main">${escapeHtml(id)}</span>${modelTag}</button>`;
     })
     .join("");
 }
@@ -474,16 +774,20 @@ function renderProfileManager(kind) {
 
 function renderProfileForm(kind, item) {
   if (kind === "llm") {
+    const profile = applyLlmPresetToEmptyFields(item, llmFamily(item));
+    const family = llmFamily(profile);
     return `
       <div class="form-grid">
         ${field("fields.id", "id", itemId(item), "required")}
-        ${field("fields.kind", "kind", item.kind || item.provider_family || "")}
-        ${field("fields.baseUrl", "base_url", item.base_url || "")}
-        ${field("fields.model", "model", item.model || "")}
-        ${field("fields.wireApi", "wire_api", item.wire_api || "chat_completions")}
-        ${field("fields.timeout", "timeout_secs", item.timeout_secs || item.timeout || "", 'type="number" min="1"')}
-        ${passwordField("fields.apiKey", "api_key", item.api_key || "")}
+        ${selectField("fields.provider", "provider_family", llmProviderOptions(family), 'required data-llm-provider="true"')}
+        ${field("fields.providerAlias", "provider_alias", profile.provider_alias || profile.alias || "", "required")}
+        ${field("fields.baseUrl", "base_url", profile.base_url || "", family === "custom" ? "required" : "")}
+        ${field("fields.model", "model", profile.model || "", "required")}
+        ${selectField("fields.wireApi", "wire_api", wireApiOptions(profile.wire_api || "chat_completions"), "required")}
+        ${field("fields.timeout", "timeout_secs", profile.timeout_secs || profile.timeout || "", 'type="number" min="1" required')}
+        ${passwordField("fields.apiKey", "api_key", profile.api_key || "")}
       </div>
+      ${renderLlmAdvancedFields(profile)}
       <div class="button-row form-actions">${actionButton("profile-save", "actions.save", "primary")}</div>
     `;
   }
@@ -512,6 +816,46 @@ function renderProfileForm(kind, item) {
       ${checkboxField("fields.deferredLoading", "deferred_loading", item.deferred_loading === true)}
     </div>
     <div class="button-row form-actions">${actionButton("profile-save", "actions.save", "primary")}</div>
+  `;
+}
+
+function renderLlmAdvancedFields(item) {
+  const family = llmFamily(item);
+  return `
+    <details class="advanced-panel">
+      <summary>${escapeHtml(t("fields.advanced"))}</summary>
+      <div class="form-grid">
+        ${field("fields.kind", "kind", item.kind || "")}
+        ${field("fields.temperature", "temperature", item.temperature ?? "", 'type="number" step="0.01" min="0" max="2"')}
+        ${field("fields.maxTokens", "max_tokens", item.max_tokens ?? "", 'type="number" min="1"')}
+        ${checkboxField("fields.requiresOpenaiAuth", "requires_openai_auth", item.requires_openai_auth === true)}
+        ${textareaField("fields.fallback", "fallback", asLines(item.fallback))}
+        ${textareaField("fields.fallbackModels", "fallback_models", asLines(item.fallback_models))}
+        ${textareaField("fields.extraHeaders", "extra_headers", JSON.stringify(item.extra_headers || {}, null, 2))}
+        ${checkboxField("fields.mergeSystemIntoUser", "merge_system_into_user", item.merge_system_into_user === true)}
+        ${textareaField("fields.providerExtra", "provider_extra", JSON.stringify(item.provider_extra || {}, null, 2))}
+        ${textareaField("fields.pricing", "pricing", JSON.stringify(item.pricing || {}, null, 2))}
+        ${selectField("fields.nativeTools", "native_tools", booleanOptions(item.native_tools))}
+        ${selectField("fields.think", "think", booleanOptions(item.think))}
+        ${textareaField("fields.chatTemplateKwargs", "chat_template_kwargs", JSON.stringify(item.chat_template_kwargs || {}, null, 2))}
+        ${field("fields.tlsCaCertPath", "tls_ca_cert_path", item.tls_ca_cert_path || "")}
+        ${
+          isProviderVisible(item, ["gemini"])
+            ? `${selectField("fields.authMode", "auth_mode", authModeOptions(item.auth_mode || ""))}
+               ${passwordField("fields.oauthClientId", "oauth_client_id", item.oauth_client_id || "")}
+               ${passwordField("fields.oauthClientSecret", "oauth_client_secret", item.oauth_client_secret || "")}
+               ${field("fields.oauthProject", "oauth_project", item.oauth_project || "")}`
+            : ""
+        }
+        ${
+          isProviderVisible(item, ["ollama"])
+            ? `${field("fields.numCtx", "num_ctx", item.num_ctx ?? "", 'type="number" min="1"')}
+               ${field("fields.numPredict", "num_predict", item.num_predict ?? "", 'type="number"')}
+               ${field("fields.temperatureOverride", "temperature_override", item.temperature_override ?? "", 'type="number" step="0.01" min="0" max="2"')}`
+            : ""
+        }
+      </div>
+    </details>
   `;
 }
 
@@ -593,10 +937,10 @@ function agentFromForm(form) {
   const matrix = current.matrix || {};
   return {
     ...current,
-    id: String(data.get("id") || "").trim(),
+    id: requireString(data, "id"),
     name: String(data.get("name") || "").trim(),
     enabled: data.get("enabled") === "on",
-    host_port: parseNumber(data.get("host_port"), current.host_port || 0),
+    host_port: requireNumber(data, "host_port", { min: 1, max: 65535 }),
     image: String(data.get("image") || "").trim(),
     llm_profile: String(data.get("llm_profile") || ""),
     matrix_profile: String(data.get("matrix_profile") || ""),
@@ -612,7 +956,7 @@ function agentFromForm(form) {
       recovery_key: keepSecret(data, "matrix_recovery_key", matrix.recovery_key),
       external_peers: fromLines(String(data.get("matrix_external_peers") || ""))
     },
-    overrides: parseJson(String(data.get("overrides") || ""), {})
+    overrides: readJsonField(data, "overrides", {})
   };
 }
 
@@ -621,20 +965,45 @@ function profileFromForm(kind, form) {
   const current = collection(kind).find((item) => itemId(item) === state[`selected${kind}Id`]) || {};
   const base = { ...current, id: String(data.get("id") || "").trim() };
   if (kind === "llm") {
-    return {
+    const family = requireString(data, "provider_family");
+    return cleanEmptyValues({
       ...base,
-      kind: String(data.get("kind") || ""),
-      base_url: String(data.get("base_url") || ""),
-      model: String(data.get("model") || ""),
-      wire_api: String(data.get("wire_api") || ""),
-      timeout_secs: parseNumber(data.get("timeout_secs"), current.timeout_secs || 0),
-      api_key: keepSecret(data, "api_key", current.api_key)
-    };
+      id: requireString(data, "id"),
+      provider_family: family,
+      provider_alias: requireString(data, "provider_alias"),
+      base_url: validateUrlLike(data.get("base_url"), "base_url", { required: family === "custom" }),
+      model: requireString(data, "model"),
+      wire_api: requireString(data, "wire_api"),
+      timeout_secs: requireNumber(data, "timeout_secs", { min: 1 }),
+      api_key: keepSecret(data, "api_key", current.api_key),
+      kind: String(data.get("kind") || "").trim(),
+      temperature: parseOptionalFloat(data.get("temperature"), fieldDisplayName("temperature"), { min: 0, max: 2 }),
+      max_tokens: parseOptionalNumber(data.get("max_tokens"), fieldDisplayName("max_tokens"), { min: 1 }),
+      requires_openai_auth: data.get("requires_openai_auth") === "on",
+      fallback: fromLines(String(data.get("fallback") || "")),
+      fallback_models: fromLines(String(data.get("fallback_models") || "")),
+      extra_headers: readJsonField(data, "extra_headers", {}),
+      merge_system_into_user: data.get("merge_system_into_user") === "on",
+      provider_extra: readJsonField(data, "provider_extra", undefined),
+      pricing: readJsonField(data, "pricing", {}),
+      native_tools: parseOptionalBoolean(String(data.get("native_tools") || "")),
+      think: parseOptionalBoolean(String(data.get("think") || "")),
+      chat_template_kwargs: readJsonField(data, "chat_template_kwargs", undefined),
+      tls_ca_cert_path: String(data.get("tls_ca_cert_path") || "").trim(),
+      auth_mode: String(data.get("auth_mode") || ""),
+      oauth_client_id: keepSecret(data, "oauth_client_id", current.oauth_client_id),
+      oauth_client_secret: keepSecret(data, "oauth_client_secret", current.oauth_client_secret),
+      oauth_project: String(data.get("oauth_project") || "").trim(),
+      num_ctx: parseOptionalNumber(data.get("num_ctx"), fieldDisplayName("num_ctx"), { min: 1 }),
+      num_predict: parseOptionalNumber(data.get("num_predict"), fieldDisplayName("num_predict")),
+      temperature_override: parseOptionalFloat(data.get("temperature_override"), fieldDisplayName("temperature_override"), { min: 0, max: 2 })
+    });
   }
   if (kind === "matrix") {
     return {
       ...base,
-      homeserver: String(data.get("homeserver") || ""),
+      id: requireString(data, "id"),
+      homeserver: validateUrlLike(data.get("homeserver"), "homeserver"),
       allowed_rooms: fromLines(String(data.get("allowed_rooms") || "")),
       mention_only: data.get("mention_only") === "on",
       reply_in_thread: data.get("reply_in_thread") === "on",
@@ -644,11 +1013,12 @@ function profileFromForm(kind, form) {
   }
   return {
     ...base,
-    server_name: String(data.get("server_name") || ""),
-    transport: String(data.get("transport") || ""),
-    url: String(data.get("url") || ""),
+    id: requireString(data, "id"),
+    server_name: String(data.get("server_name") || "").trim(),
+    transport: String(data.get("transport") || "").trim(),
+    url: validateUrlLike(data.get("url"), "url"),
     token: keepSecret(data, "token", current.token),
-    timeout_secs: parseNumber(data.get("timeout_secs"), current.timeout_secs || 0),
+    timeout_secs: parseOptionalNumber(data.get("timeout_secs"), fieldDisplayName("timeout_secs"), { min: 1 }) || 0,
     deferred_loading: data.get("deferred_loading") === "on"
   };
 }
@@ -747,7 +1117,13 @@ async function handleAction(action) {
     render();
   }
   if (action === "agent-save") {
-    const item = agentFromForm(document.querySelector('[data-form="agent"]'));
+    let item;
+    try {
+      item = agentFromForm(document.querySelector('[data-form="agent"]'));
+    } catch (error) {
+      if (error instanceof FormValidationError) return alertValidation(error);
+      throw error;
+    }
     return runAction(async () => {
       await saveItem("agents", state.selectedAgentId, item);
       state.selectedAgentId = itemId(item);
@@ -778,8 +1154,7 @@ async function handleAction(action) {
 
   for (const kind of ["llm", "matrix", "mcp"]) {
     if (action === `${kind}-new`) {
-      const item = { id: nextId(kind, collection(kind)) };
-      item._draft = true;
+      const item = kind === "llm" ? createLlmProfile(nextId(kind, collection(kind))) : { id: nextId(kind, collection(kind)), _draft: true };
       state.config.profiles[kind].unshift(item);
       state[`selected${kind}Id`] = item.id;
       render();
@@ -788,7 +1163,13 @@ async function handleAction(action) {
   }
   if (action === "profile-save") {
     const kind = document.querySelector(".form-panel")?.dataset.form;
-    const item = profileFromForm(kind, document.querySelector(`[data-form="${kind}"]`));
+    let item;
+    try {
+      item = profileFromForm(kind, document.querySelector(`[data-form="${kind}"]`));
+    } catch (error) {
+      if (error instanceof FormValidationError) return alertValidation(error);
+      throw error;
+    }
     return runAction(async () => {
       await saveItem(kind, state[`selected${kind}Id`], item);
       state[`selected${kind}Id`] = itemId(item);
@@ -922,7 +1303,20 @@ function bindEvents() {
       configureAutoRefresh();
       render();
     }
+    if (event.target.matches("[data-llm-provider]")) {
+      applyLlmPresetToForm(event.target.form, event.target.value);
+    }
   });
+}
+
+function applyLlmPresetToForm(form, family) {
+  if (!form) return;
+  const preset = LLM_PRESETS[family] || LLM_PRESETS.openai;
+  for (const key of LLM_PROVIDER_FIELDS) {
+    const input = form.elements[key];
+    if (!input || key === "provider_family") continue;
+    input.value = preset[key] ?? "";
+  }
 }
 
 function configureAutoRefresh() {

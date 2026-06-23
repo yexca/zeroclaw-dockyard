@@ -357,6 +357,10 @@ class AgentRendererTest(unittest.TestCase):
                         "base_url": "https://api.deepseek.com/v1",
                         "wire_api": "chat_completions",
                         "timeout_secs": 120,
+                        "temperature": 0.2,
+                        "max_tokens": 4096,
+                        "fallback_models": ["deepseek-reasoner"],
+                        "extra_headers": {"X-Test": "yes"},
                     }
                 ],
                 "matrix": [{"id": "matrix-main", "mention_only": False}],
@@ -385,6 +389,10 @@ class AgentRendererTest(unittest.TestCase):
             self.assertIn(key, env)
         self.assertEqual(env["BOT_NAME"], "agent1")
         self.assertEqual(env["MODEL_PROVIDER_MODEL"], "deepseek-chat")
+        self.assertEqual(env["MODEL_PROVIDER_TEMPERATURE"], "0.2")
+        self.assertEqual(env["MODEL_PROVIDER_MAX_TOKENS"], "4096")
+        self.assertEqual(env["MODEL_PROVIDER_FALLBACK_MODELS"], '["deepseek-reasoner"]')
+        self.assertEqual(env["MODEL_PROVIDER_EXTRA_HEADERS"], '{ "X-Test" = "yes" }')
         self.assertEqual(env["MATRIX_USER_ID"], "@agent1:matrix.example.com")
 
     def test_workspace_keep_and_merge_modes_do_not_silently_overwrite(self) -> None:
