@@ -9,6 +9,7 @@ server:
 docker:
   proxy_url: http://docker-socket-proxy:2375
   project_name: zeroclaw-matrix-multi
+  control_network: zeroclaw-matrix-multi_manager-control
 
 paths:
   secrets_file: /app/config/secrets.yaml

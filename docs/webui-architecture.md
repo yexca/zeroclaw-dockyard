@@ -32,7 +32,7 @@ configuration, and generated output work can evolve independently.
   `127.0.0.1:${MANAGER_HOST_PORT:-7652}`.
 - `docker-socket-proxy`: the only service with direct access to
   `/var/run/docker.sock`. The manager talks to Docker through
-  `http://docker-socket-proxy:2375`.
+  `http://docker-socket-proxy:2375` on the internal `manager-control` network.
 
 The existing `agent1`, `agent2`, and `agent3` services are unchanged in purpose
 and can still be started directly with:
@@ -95,10 +95,43 @@ this path:
 browser -> manager WebUI/API -> docker-socket-proxy -> Docker daemon
 ```
 
-The Compose proxy service currently enables the broad capabilities needed for
-later development of container, image, network, volume, and write operations.
-Permission tightening and exact endpoint selection are deferred to the Docker
-socket proxy implementation stage.
+The Compose proxy service uses `tecnativa/docker-socket-proxy` because it is a
+small HAProxy-based image that gates Docker API URL sections through environment
+variables. It is attached only to the internal `manager-control` network and is
+not published to the host.
+
+The manager receives the proxy URL through `DOCKER_API_URL`, defaulting to
+`http://docker-socket-proxy:2375`.
+
+### Proxy Permissions
+
+Enabled permissions:
+
+- `PING=1` and `VERSION=1`: health checks and Docker API compatibility checks.
+- `CONTAINERS=1`: list and inspect containers, create manager-owned agent
+  containers, delete manager-owned containers, and read container logs.
+- `ALLOW_START=1`: start manager-owned agent containers.
+- `ALLOW_STOP=1`: stop manager-owned agent containers.
+- `ALLOW_RESTARTS=1`: restart manager-owned agent containers. The proxy image
+  also allows the Docker `kill` path under this switch, so manager code must not
+  call `kill` unless a later safety review explicitly adds that behavior.
+- `IMAGES=1`: inspect local images and pull the configured ZeroClaw image.
+- `NETWORKS=1`: inspect or create the dedicated runtime network used by managed
+  agents.
+- `POST=1`: required by Docker for create, start, stop, restart, delete, pull,
+  and network creation operations.
+
+Explicitly disabled permissions:
+
+- `AUTH`, `BUILD`, `COMMIT`, `CONFIGS`, `DISTRIBUTION`, `EXEC`, `GRPC`, `INFO`,
+  `NODES`, `PLUGINS`, `SECRETS`, `SERVICES`, `SESSION`, `SWARM`, `SYSTEM`,
+  `TASKS`, and `VOLUMES`.
+- `ALLOW_PAUSE` and `ALLOW_UNPAUSE`.
+- `EVENTS`, until a later observability phase needs Docker event streaming.
+
+The disabled set intentionally excludes unrelated capabilities such as Docker
+exec, system operations, swarm/service management, secret access, image build,
+and global volume deletion.
 
 Agent containers created by the future manager should be labeled with the
 Compose project or an explicit manager label so the backend can distinguish
@@ -111,12 +144,16 @@ Implemented in this stage:
 - The WebUI host port is bound to `127.0.0.1` only.
 - The manager container has no direct Docker socket mount.
 - Docker socket access is isolated in `docker-socket-proxy`.
+- The socket proxy is reachable only from containers attached to the internal
+  `manager-control` network.
+- Socket proxy permissions are limited to the Docker API sections needed for
+  agent container lifecycle, image pull/inspect, logs, and runtime network
+  management.
 - Local plaintext secrets files are ignored by Git.
 - Example config files contain placeholders only.
 
 Deferred to later stages:
 
-- Narrow Docker socket proxy permissions to the exact API surface required.
 - Validate all config and secret fields before writing files or touching
   containers.
 - Add CSRF and browser-origin protections if non-loopback access is ever
@@ -124,6 +161,11 @@ Deferred to later stages:
 - Add explicit safeguards before deleting containers, volumes, generated files,
   or instance data.
 - Add logs and audit records for manager-initiated Docker operations.
+
+The proxy remains a high-privilege security boundary. Any service that can reach
+it can still perform the enabled Docker write operations against the host daemon.
+This is more controllable than mounting `/var/run/docker.sock` into the manager,
+but it does not make Docker control low-risk.
 
 ## Compatibility
 

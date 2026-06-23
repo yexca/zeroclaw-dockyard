@@ -75,13 +75,39 @@ services:
     restart: unless-stopped
     environment:
       LOG_LEVEL: ${DOCKER_SOCKET_PROXY_LOG_LEVEL:-info}
+      PING: ${DOCKER_SOCKET_PROXY_PING:-1}
+      VERSION: ${DOCKER_SOCKET_PROXY_VERSION:-1}
+      EVENTS: ${DOCKER_SOCKET_PROXY_EVENTS:-0}
+      POST: ${DOCKER_SOCKET_PROXY_POST:-1}
       CONTAINERS: ${DOCKER_SOCKET_PROXY_CONTAINERS:-1}
+      ALLOW_START: ${DOCKER_SOCKET_PROXY_ALLOW_START:-1}
+      ALLOW_STOP: ${DOCKER_SOCKET_PROXY_ALLOW_STOP:-1}
+      ALLOW_RESTARTS: ${DOCKER_SOCKET_PROXY_ALLOW_RESTARTS:-1}
+      ALLOW_PAUSE: ${DOCKER_SOCKET_PROXY_ALLOW_PAUSE:-0}
+      ALLOW_UNPAUSE: ${DOCKER_SOCKET_PROXY_ALLOW_UNPAUSE:-0}
       IMAGES: ${DOCKER_SOCKET_PROXY_IMAGES:-1}
       NETWORKS: ${DOCKER_SOCKET_PROXY_NETWORKS:-1}
-      VOLUMES: ${DOCKER_SOCKET_PROXY_VOLUMES:-1}
-      POST: ${DOCKER_SOCKET_PROXY_POST:-1}
+      AUTH: ${DOCKER_SOCKET_PROXY_AUTH:-0}
+      BUILD: ${DOCKER_SOCKET_PROXY_BUILD:-0}
+      COMMIT: ${DOCKER_SOCKET_PROXY_COMMIT:-0}
+      CONFIGS: ${DOCKER_SOCKET_PROXY_CONFIGS:-0}
+      DISTRIBUTION: ${DOCKER_SOCKET_PROXY_DISTRIBUTION:-0}
+      EXEC: ${DOCKER_SOCKET_PROXY_EXEC:-0}
+      GRPC: ${DOCKER_SOCKET_PROXY_GRPC:-0}
+      INFO: ${DOCKER_SOCKET_PROXY_INFO:-0}
+      NODES: ${DOCKER_SOCKET_PROXY_NODES:-0}
+      PLUGINS: ${DOCKER_SOCKET_PROXY_PLUGINS:-0}
+      SECRETS: ${DOCKER_SOCKET_PROXY_SECRETS:-0}
+      SERVICES: ${DOCKER_SOCKET_PROXY_SERVICES:-0}
+      SESSION: ${DOCKER_SOCKET_PROXY_SESSION:-0}
+      SWARM: ${DOCKER_SOCKET_PROXY_SWARM:-0}
+      SYSTEM: ${DOCKER_SOCKET_PROXY_SYSTEM:-0}
+      TASKS: ${DOCKER_SOCKET_PROXY_TASKS:-0}
+      VOLUMES: ${DOCKER_SOCKET_PROXY_VOLUMES:-0}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - manager-control
 
   manager:
     build:
@@ -104,6 +130,9 @@ services:
     volumes:
       - ./config:/app/config
       - ./instances:/app/instances
+    networks:
+      - default
+      - manager-control
 
   agent1:
     <<: *zeroclaw-common
@@ -216,3 +245,6 @@ services:
       PROACTIVE_PROMPT: ${PROACTIVE_PROMPT:-You are being invoked by the proactive sidecar, not by the user. Review HEARTBEAT.md, memory, and current context. If there is a concrete, timely reason to contact the user, send one short Matrix message with send_message_to_peer using the configured channel and peer target. If there is no useful reason, respond exactly with "skip".}
     command: ["python", "/app/proactive.py"]
 
+networks:
+  manager-control:
+    internal: true
