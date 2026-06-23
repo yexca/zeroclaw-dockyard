@@ -1,8 +1,15 @@
 # ZeroClaw Multi Docker
 
-用于在一个 Docker Compose 项目中创建和管理多个 ZeroClaw Matrix agent 的本地 WebUI 管理器。
+用于在一个 Docker Compose 项目中创建和管理多个 ZeroClaw Matrix agent
+的本地 WebUI 管理器。
 
-现在默认入口只有管理器。直接运行 `docker compose up -d` 只会启动 WebUI 和 Docker socket proxy；agent 容器完全由 WebUI 通过 Docker API 创建、配置、启动、停止和删除。
+管理器是默认的唯一入口。直接运行 `docker compose up -d` 只会启动
+WebUI 和 Docker socket proxy；agent 容器由 WebUI 通过 Docker API 创建、
+配置、启动、停止和删除。
+
+管理器镜像会在 Docker 构建阶段编译前端，并由 Python 后端服务生成后的
+静态文件。WebUI 会先加载配置编辑界面，再在后台刷新依赖 Docker 的
+Dashboard 状态。
 
 英文文档见 [README.md](README.md)。
 
@@ -10,11 +17,12 @@
 
 - `docker-compose.yml`: WebUI 管理器和 Docker socket proxy。
 - `.env.example`: WebUI/proxy 启动参数的可选覆盖示例。
-- `config/manager.example.yaml`: 管理器结构化配置示例。
+- `config/manager.example.yaml`: 结构化管理器配置示例。
 - `config/secrets.example.yaml`: 本地明文密钥模板。
 - `manager/`: WebUI 后端和前端。
-- `bootstrap/render-config.sh`: 注入到 WebUI 创建的 agent 容器中使用。
-- `templates/workspace/`: workspace 提示词文件模板。
+- `bootstrap/render-config.sh`: 注入到管理器创建的 agent 容器中使用。
+- `templates/workspace/`: workspace 初始提示词文件。
+- `docs/`: 运维、参考、架构和开发文档。
 
 ## 启动
 
@@ -26,31 +34,34 @@ docker compose up -d
 
 打开 `http://127.0.0.1:7652`。
 
-管理器只绑定 `127.0.0.1`，并通过 `docker-socket-proxy` 访问 Docker。manager 容器不会直接挂载 `/var/run/docker.sock`。
+管理器只绑定 `127.0.0.1`，并通过 `docker-socket-proxy` 访问 Docker。
+manager 容器不会直接挂载 `/var/run/docker.sock`。
 
 ## 配置 Agent
 
 在 WebUI 中编辑：
 
-- LLM 配置
-- Matrix 配置
-- MCP 配置
-- 提示词模板
-- 每个 agent 的端口、身份、模型/配置引用和密钥
+- LLM profiles
+- Matrix profiles
+- MCP profiles
+- prompt templates
+- 每个 agent 的端口、身份、模型/profile 引用和密钥
 
-仪表盘会显示运行状态、日志、配置哈希、是否需要重建，以及操作历史。
+Dashboard 会显示运行状态、日志、配置哈希、是否需要重建以及操作历史。
 
 详细文档：
 
+- [文档索引](docs/README.md)
+- [快速开始](docs/getting-started/quickstart.md)
 - [WebUI 使用说明](docs/guides/webui-usage.md)
 - [配置 schema](docs/reference/config-schema.md)
-- [Docker socket proxy 安全边界](docs/concepts/docker-socket-proxy-security.md)
-- [i18n 和主题](docs/development/i18n-theme.md)
+- [API 参考](docs/reference/api.md)
 - [架构说明](docs/concepts/architecture.md)
+- [Docker socket proxy 安全边界](docs/concepts/docker-socket-proxy-security.md)
 
 ## 镜像
 
-WebUI 创建的 agent 默认使用：
+管理器创建的 agent 默认使用：
 
 ```env
 ZEROCLAW_IMAGE=ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
@@ -70,11 +81,11 @@ ZEROCLAW_IMAGE=ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
 - `config/generated/*`
 - `instances/*`
 
-仓库内 `.gitignore` 已覆盖这些路径。
+仓库中的 `.gitignore` 已覆盖这些路径。
 
 ## 测试和发布检查
 
-运行完整本地发布检查：
+运行完整的本地发布检查：
 
 ```powershell
 .\tools\release-checks.ps1
@@ -85,5 +96,11 @@ ZEROCLAW_IMAGE=ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
 ```powershell
 docker compose config --quiet
 python -m unittest discover manager/backend/tests
-node manager/frontend/tests/ui-foundation.test.mjs
+docker run --rm -v "${PWD}/manager/frontend:/work" -w /work node:22-alpine npm test
+```
+
+Docker 镜像构建会在 `node:22-alpine` 阶段执行前端构建：
+
+```powershell
+docker build -t zeroclaw-manager:test ./manager
 ```
