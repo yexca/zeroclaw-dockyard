@@ -31,7 +31,8 @@ export async function loadDefaultPreferences(fetcher = fetch) {
       return DEFAULT_PREFERENCES;
     }
 
-    const data = await response.json();
+    const payload = await response.json();
+    const data = payload.data || payload;
     return {
       language: data.default_language || DEFAULT_PREFERENCES.language,
       theme: data.default_theme || DEFAULT_PREFERENCES.theme

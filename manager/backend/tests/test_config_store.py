@@ -75,6 +75,23 @@ class ConfigStoreTest(unittest.TestCase):
         self.assertTrue(Path(result["path"]).exists())
         self.assertEqual(result["config"]["version"], 1)
 
+    def test_apply_prompt_template_writes_workspace_files(self) -> None:
+        self.store.update_full_config(
+            {
+                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "agents": [{"id": "agent1", "prompt_template": "default"}],
+            }
+        )
+
+        result = self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
+
+        self.assertEqual(result["written"], ["AGENTS.md"])
+        self.assertEqual(
+            (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
+            "hello",
+        )
+
     def test_redact_masks_sensitive_fields(self) -> None:
         payload = {
             "api_key": "secret",

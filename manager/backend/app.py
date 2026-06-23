@@ -218,6 +218,9 @@ class ManagerHandler(BaseHTTPRequestHandler):
             if method == "POST" and action == "validate":
                 success(self, 200, STORE.validate_agent(identifier))
                 return
+            if method == "POST" and action == "apply-template":
+                success(self, 200, STORE.apply_prompt_template(identifier, self.read_optional_json()))
+                return
             if method == "POST" and action in {"start", "stop", "restart"}:
                 success(self, 202, getattr(DOCKER, action)(agent))
                 return

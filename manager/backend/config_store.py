@@ -19,6 +19,7 @@ PROFILE_COLLECTIONS = {
 }
 
 PROMPT_TEMPLATE_KEY = "prompt_templates"
+PROMPT_TEMPLATE_FILES = {"AGENTS.md", "IDENTITY.md", "SOUL.md", "MEMORY.md", "TOOLS.md", "USER.md", "HEARTBEAT.md"}
 
 
 class ConfigError(Exception):
@@ -221,6 +222,51 @@ class ConfigStore:
         target = self.generated_dir / export_name
         self._atomic_write_yaml(target, config)
         return {"path": str(target), "config": config}
+
+    def apply_prompt_template(self, identifier: str, payload: Any | None = None) -> dict[str, Any]:
+        config = self.load()
+        agent = self.get_agent(identifier)
+        template_id = agent.get("prompt_template")
+        if not template_id:
+            raise ConfigError("missing_prompt_template", "Agent does not reference a prompt template.")
+
+        template_index = self._find_index(self._get_collection(config, "prompt_templates"), str(template_id))
+        if template_index is None:
+            raise ConfigError("not_found", "Prompt template was not found.", {"id": template_id}, 404)
+
+        mode = "keep"
+        if isinstance(payload, dict) and isinstance(payload.get("mode"), str):
+            mode = payload["mode"]
+        if mode not in {"keep", "missing", "overwrite"}:
+            raise ConfigError("invalid_mode", "Template apply mode must be keep, missing, or overwrite.", {"mode": mode})
+
+        template = self._get_collection(config, "prompt_templates")[template_index]
+        files = template.get("files") if isinstance(template.get("files"), dict) else {}
+        instances_dir = Path(str(config.get("paths", {}).get("instances_dir") or "instances"))
+        workspace_dir = instances_dir / str(item_id(agent)) / "workspace"
+        written: list[str] = []
+        skipped: list[str] = []
+
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        for filename, content in files.items():
+            if filename not in PROMPT_TEMPLATE_FILES:
+                skipped.append(str(filename))
+                continue
+            target = workspace_dir / filename
+            if mode == "keep" or (mode == "missing" and target.exists()):
+                skipped.append(filename)
+                continue
+            target.write_text(str(content), encoding="utf-8")
+            written.append(filename)
+
+        return {
+            "agent": item_id(agent),
+            "template": template_id,
+            "mode": mode,
+            "workspace": str(workspace_dir),
+            "written": written,
+            "skipped": skipped,
+        }
 
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         config = deep_merge(default_config(), raw)

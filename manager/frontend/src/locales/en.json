@@ -3,7 +3,7 @@
     "title": "ZeroClaw Manager",
     "eyebrow": "ZeroClaw Matrix",
     "heading": "Manager WebUI",
-    "description": "This container is the local control surface for structured agent configuration and Docker API orchestration."
+    "description": "Local control surface for structured agent configuration and Docker API orchestration."
   },
   "preferences": {
     "label": "Preferences",
@@ -18,6 +18,140 @@
       "dark": "Dark",
       "system": "System"
     }
+  },
+  "nav": {
+    "label": "Management sections",
+    "dashboard": "Dashboard",
+    "agents": "Agents",
+    "llm": "LLM Profiles",
+    "matrix": "Matrix Profiles",
+    "mcp": "MCP Profiles",
+    "prompts": "Prompt Templates",
+    "export": "Export"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Agent runtime state, quick controls, and recent logs.",
+    "empty": "No agents are configured yet.",
+    "logsEmpty": "No logs loaded."
+  },
+  "agents": {
+    "title": "Agent Editor",
+    "subtitle": "Create agents, wire profiles, and edit per-agent overrides.",
+    "empty": "Create or select an agent to edit its settings."
+  },
+  "llm": {
+    "title": "LLM Profiles",
+    "subtitle": "Provider profile pool for model access and request behavior.",
+    "empty": "Create or select an LLM profile."
+  },
+  "matrix": {
+    "title": "Matrix Profiles",
+    "subtitle": "Shared homeserver, room, thread, reaction, and stream settings.",
+    "empty": "Create or select a Matrix profile."
+  },
+  "mcp": {
+    "title": "MCP Profiles",
+    "subtitle": "One MCP gateway/server profile can be assigned per agent.",
+    "empty": "Create or select an MCP profile."
+  },
+  "prompts": {
+    "title": "Prompt Templates",
+    "subtitle": "Edit reusable workspace prompt files and duplicate templates.",
+    "empty": "Create or select a prompt template."
+  },
+  "export": {
+    "title": "Config Export",
+    "subtitle": "Inspect primary config, resolved config, and generated output preview.",
+    "primary": "Primary config",
+    "resolved": "Resolved config",
+    "generated": "Generated compose/env preview"
+  },
+  "actions": {
+    "create": "Create",
+    "duplicate": "Duplicate",
+    "edit": "Edit",
+    "save": "Save",
+    "delete": "Delete",
+    "validate": "Validate",
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "logs": "Logs",
+    "refreshStatus": "Refresh status",
+    "applyTemplate": "Apply template",
+    "export": "Export"
+  },
+  "fields": {
+    "id": "ID",
+    "name": "Name",
+    "kind": "Kind",
+    "hostPort": "Host port",
+    "image": "Image",
+    "enabled": "Enabled",
+    "llmProfile": "LLM profile",
+    "matrixProfile": "Matrix profile",
+    "mcpProfile": "MCP profile",
+    "promptTemplate": "Prompt template",
+    "templateApplyMode": "Template apply mode",
+    "matrixUser": "Matrix user",
+    "deviceId": "Device ID",
+    "externalPeers": "External peers",
+    "accessToken": "Access token",
+    "password": "Password",
+    "recoveryKey": "Recovery key",
+    "overrides": "Agent-specific overrides (JSON)",
+    "baseUrl": "Base URL",
+    "model": "Model",
+    "wireApi": "Wire API",
+    "timeout": "Timeout seconds",
+    "apiKey": "API key",
+    "homeserver": "Homeserver",
+    "allowedRooms": "Allowed rooms",
+    "mentionOnly": "Mention only",
+    "replyInThread": "Reply in thread",
+    "ackReactions": "Ack reactions",
+    "streamMode": "Stream mode",
+    "serverName": "Server name",
+    "transport": "Transport",
+    "url": "URL",
+    "token": "Token",
+    "deferredLoading": "Deferred loading",
+    "description": "Description",
+    "mcpStatus": "MCP status"
+  },
+  "templateApply": {
+    "keep": "Keep existing files",
+    "missing": "Write only missing files",
+    "overwrite": "Overwrite workspace files"
+  },
+  "validation": {
+    "valid": "Validation passed",
+    "invalid": "Validation failed"
+  },
+  "messages": {
+    "saved": "Saved.",
+    "deleted": "Deleted.",
+    "exported": "Export complete.",
+    "templateApplied": "Template applied.",
+    "started": "Start requested.",
+    "stopped": "Stop requested.",
+    "restarted": "Restart requested."
+  },
+  "confirm": {
+    "deleteAgent": "Delete this agent? This cannot be undone.",
+    "deleteProfile": "Delete this profile? Assigned agents may need updates.",
+    "deleteTemplate": "Delete this prompt template?",
+    "overwriteWorkspace": "Overwrite existing workspace prompt files?"
+  },
+  "common": {
+    "loading": "Loading...",
+    "empty": "Nothing here yet.",
+    "none": "None",
+    "unknown": "Unknown",
+    "unnamed": "Unnamed",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   },
   "status": {
     "status": "Status",
