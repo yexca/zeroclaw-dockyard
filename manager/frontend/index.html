@@ -3,26 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ZeroClaw Manager</title>
+    <meta name="color-scheme" content="light dark" />
+    <title data-i18n="app.title">ZeroClaw Manager</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="shell">
       <section class="panel">
-        <p class="eyebrow">ZeroClaw Matrix</p>
-        <h1>Manager WebUI</h1>
-        <p>
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow" data-i18n="app.eyebrow">ZeroClaw Matrix</p>
+            <h1 data-i18n="app.heading">Manager WebUI</h1>
+          </div>
+          <div class="toolbar" aria-label="Preferences" data-i18n-aria-label="preferences.label">
+            <label class="control">
+              <span data-i18n="preferences.language">Language</span>
+              <select id="language-switcher"></select>
+            </label>
+            <label class="control">
+              <span data-i18n="preferences.theme">Theme</span>
+              <select id="theme-switcher"></select>
+            </label>
+          </div>
+        </header>
+        <p data-i18n="app.description">
           This container is the local control surface for structured agent
           configuration and Docker API orchestration.
         </p>
         <dl id="status">
           <div>
-            <dt>Status</dt>
-            <dd>Loading</dd>
+            <dt data-i18n="status.status">Status</dt>
+            <dd data-i18n="status.loading">Loading</dd>
           </div>
         </dl>
       </section>
     </main>
-    <script src="/status.js"></script>
+    <script type="module" src="/src/app.mjs"></script>
   </body>
 </html>

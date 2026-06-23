@@ -51,6 +51,17 @@ class ManagerHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/webui/defaults":
+            json_response(
+                self,
+                200,
+                {
+                    "default_language": os.getenv("WEBUI_DEFAULT_LANGUAGE", "en"),
+                    "default_theme": os.getenv("WEBUI_DEFAULT_THEME", "system"),
+                },
+            )
+            return
+
         self.serve_frontend(path)
 
     def serve_frontend(self, path: str) -> None:
@@ -68,8 +79,10 @@ class ManagerHandler(BaseHTTPRequestHandler):
         content_type = "text/html; charset=utf-8"
         if target.suffix == ".css":
             content_type = "text/css; charset=utf-8"
-        elif target.suffix == ".js":
+        elif target.suffix in {".js", ".mjs"}:
             content_type = "application/javascript; charset=utf-8"
+        elif target.suffix == ".json":
+            content_type = "application/json; charset=utf-8"
 
         body = target.read_bytes()
         self.send_response(200)

@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "ZeroClaw 管理器",
+    "eyebrow": "ZeroClaw Matrix",
+    "heading": "管理器 WebUI",
+    "description": "此容器是本地控制台，用于管理结构化智能体配置和 Docker API 编排。"
+  },
+  "preferences": {
+    "label": "偏好设置",
+    "language": "语言",
+    "theme": "主题",
+    "languages": {
+      "en": "英语",
+      "zh-CN": "简体中文"
+    },
+    "themes": {
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    }
+  },
+  "status": {
+    "status": "状态",
+    "loading": "加载中",
+    "unavailable": "不可用",
+    "ok": "正常",
+    "stage": "阶段",
+    "dockerApiUrl": "Docker API URL",
+    "managerConfigPath": "管理器配置路径",
+    "managerSecretsPath": "管理器密钥路径",
+    "generatedConfigDir": "生成配置目录"
+  }
+}

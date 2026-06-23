@@ -1,0 +1,33 @@
+{
+  "app": {
+    "title": "ZeroClaw Manager",
+    "eyebrow": "ZeroClaw Matrix",
+    "heading": "Manager WebUI",
+    "description": "This container is the local control surface for structured agent configuration and Docker API orchestration."
+  },
+  "preferences": {
+    "label": "Preferences",
+    "language": "Language",
+    "theme": "Theme",
+    "languages": {
+      "en": "English",
+      "zh-CN": "Simplified Chinese"
+    },
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    }
+  },
+  "status": {
+    "status": "Status",
+    "loading": "Loading",
+    "unavailable": "Unavailable",
+    "ok": "OK",
+    "stage": "Stage",
+    "dockerApiUrl": "Docker API URL",
+    "managerConfigPath": "Manager config path",
+    "managerSecretsPath": "Manager secrets path",
+    "generatedConfigDir": "Generated config directory"
+  }
+}
