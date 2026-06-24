@@ -61,6 +61,7 @@ operators save it explicitly.
 - `POST /api/agents/{id}/apply-template`
 - `POST /api/agents/{id}/sync-to-runtime`
 - `POST /api/agents/{id}/sync-from-runtime`
+- `POST /api/agents/{id}/reset-matrix-state`
 - `POST /api/agents/{id}/export`
 - `POST /api/agents/{id}/{start|stop|restart|delete}`
 - `GET /api/agents/{id}/status`

@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -57,6 +58,9 @@ class DockerController(Protocol):
         ...
 
     def sync_from_runtime(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    def reset_matrix_state(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         ...
 
 
@@ -333,6 +337,41 @@ class DockerApiController:
             return self.operation_result("sync-from-runtime", spec, {}, ["bind_storage_noop"])
         self.sync_runtime_to_local(spec)
         return self.operation_result("sync-from-runtime", spec, {}, ["runtime_synced_to_local"])
+
+    def reset_matrix_state(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
+        self.configure_client(config)
+        spec = self.build_container_spec(config, agent)
+        container = self.find_container(spec)
+        if container and self.is_managed_container(container, spec):
+            state = container.get("State", {}) if isinstance(container, dict) else {}
+            if state.get("Running"):
+                raise ConfigError(
+                    "agent_running",
+                    "Agent container is running. Stop it before resetting Matrix state.",
+                    {"agent": spec.agent_id, "container": spec.container_name},
+                    409,
+                )
+        elif container:
+            raise ConfigError(
+                "container_not_manager_owned",
+                "Refusing to inspect a container without the manager label.",
+                {"container": spec.container_name},
+                409,
+            )
+
+        actions: list[str] = []
+        if spec.storage_driver == "volume":
+            self.run_matrix_reset_helper(spec)
+            actions.append("matrix_state_removed_from_local_and_runtime")
+        else:
+            matrix_dir = (spec.instance_dir / ".zeroclaw" / "state" / "matrix").resolve()
+            instance_dir = spec.instance_dir.resolve()
+            if instance_dir != matrix_dir and instance_dir not in matrix_dir.parents:
+                raise ConfigError("unsafe_matrix_state_path", "Refusing to delete Matrix state outside the agent instance directory.", {"path": str(matrix_dir)}, 409)
+            if matrix_dir.exists():
+                shutil.rmtree(matrix_dir)
+            actions.append("matrix_state_removed_from_local")
+        return self.operation_result("reset-matrix-state", spec, container or {}, actions)
 
     def reconcile_proactive_container(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec") -> list[str]:
         proactive_spec = self.build_proactive_spec(config, agent, agent_spec=agent_spec)
@@ -686,6 +725,55 @@ class DockerApiController:
                 except DockerApiError:
                     pass
 
+    def run_matrix_reset_helper(self, spec: "ContainerSpec") -> None:
+        helper_name = f"zeroclaw-reset-matrix-{spec.safe_name}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        script = self.matrix_reset_script(spec.safe_name)
+        payload = {
+            "Image": SYNC_HELPER_IMAGE,
+            "Cmd": ["python", "-c", script],
+            "Labels": {MANAGER_LABEL: "true", AGENT_ID_LABEL: spec.agent_id, AGENT_NAME_LABEL: spec.agent_name, ROLE_LABEL: "sync"},
+            "HostConfig": {
+                "AutoRemove": False,
+                "VolumesFrom": ["zeroclaw-manager:rw"],
+                "Mounts": [{"Type": "volume", "Source": spec.volume_name, "Target": "/volume"}],
+            },
+        }
+        container_id = ""
+        try:
+            created = self.client.request("POST", "/containers/create", payload=payload, query={"name": helper_name})
+            container_id = str(created.get("Id") or "")
+            self.client.request("POST", f"/containers/{container_id}/start")
+            result = self.client.request("POST", f"/containers/{container_id}/wait")
+            status_code = result.get("StatusCode") if isinstance(result, dict) else None
+            if status_code != 0:
+                logs = ""
+                try:
+                    logs = decode_docker_log_stream(self.client.request("GET", f"/containers/{container_id}/logs", query={"stdout": 1, "stderr": 1}, raw=True))
+                except DockerApiError:
+                    pass
+                raise ConfigError("matrix_reset_failed", "Matrix state reset failed.", {"status_code": status_code, "logs": logs}, 502)
+        finally:
+            if container_id:
+                try:
+                    self.remove_container(container_id, force=True)
+                except DockerApiError:
+                    pass
+
+    def matrix_reset_script(self, safe_name: str) -> str:
+        return f"""
+import shutil
+from pathlib import Path
+
+targets = [
+    Path('/app/instances') / {safe_name!r} / '.zeroclaw' / 'state' / 'matrix',
+    Path('/volume') / '.zeroclaw' / 'state' / 'matrix',
+]
+
+for target in targets:
+    if target.exists():
+        shutil.rmtree(target)
+"""
+
     def sync_script(self, direction: str, safe_name: str) -> str:
         return f"""
 import os
@@ -890,6 +978,9 @@ class FakeDockerController:
 
     def sync_from_runtime(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         return self._operation("sync-from-runtime", agent, "stubbed")
+
+    def reset_matrix_state(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
+        return self._operation("reset-matrix-state", agent, "stubbed")
 
     def _operation(self, operation: str, agent: dict[str, Any], state: str) -> dict[str, Any]:
         return {

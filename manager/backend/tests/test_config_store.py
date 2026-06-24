@@ -115,6 +115,33 @@ class ConfigStoreTest(unittest.TestCase):
         self.assertTrue(Path(result["path"]).exists())
         self.assertEqual(result["config"]["version"], 1)
 
+    def test_rotate_matrix_device_id_updates_agent_override(self) -> None:
+        self.store.update_full_config(
+            {
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token", "device_id": "PROFILE_DEVICE"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    }
+                ],
+            }
+        )
+
+        result = self.store.rotate_matrix_device_id("agent1")
+        agent = self.store.get_agent("agent1")
+
+        self.assertTrue(result["device_id"].startswith("ZEROCLAW_AGENT1_"))
+        self.assertEqual(agent["matrix"]["device_id"], result["device_id"])
+        self.assertEqual(result["previous_device_id"], "")
+
     def test_apply_prompt_template_writes_workspace_files(self) -> None:
         self.store.update_full_config(
             {
@@ -377,6 +404,39 @@ class DockerControllerTest(unittest.TestCase):
         self.assertIsNotNone(spec)
         assert spec is not None
         self.assertEqual(spec.environment["PROACTIVE_AGENT_URL"], "http://gateway.local/custom")
+
+    def test_reset_matrix_state_rejects_running_container(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+        agent = {"id": "agent1", "host_port": 42641}
+        spec = controller.build_container_spec({}, agent)
+        controller.find_container = lambda _spec: {
+            "Id": "container-id",
+            "State": {"Running": True},
+            "Config": {"Labels": spec.labels},
+        }
+
+        with self.assertRaises(ConfigError) as context:
+            controller.reset_matrix_state({}, agent)
+
+        self.assertEqual(context.exception.code, "agent_running")
+
+    def test_reset_matrix_state_removes_bind_matrix_directory(self) -> None:
+        root = Path(self.temp_dir.name)
+        instance = root / "instances" / "agent1"
+        matrix_dir = instance / ".zeroclaw" / "state" / "matrix"
+        matrix_dir.mkdir(parents=True)
+        (matrix_dir / "crypto.sqlite3").write_text("state", encoding="utf-8")
+        controller = DockerApiController("http://docker-socket-proxy:2375", root)
+        controller._manager_mounts = {
+            "/app/instances": str(root / "instances"),
+            "/app/bootstrap": str(root / "bootstrap"),
+        }
+        controller.find_container = lambda _spec: None
+
+        result = controller.reset_matrix_state({"docker": {"storage_driver": "bind"}}, {"id": "agent1", "host_port": 42641})
+
+        self.assertFalse(matrix_dir.exists())
+        self.assertIn("matrix_state_removed_from_local", result["actions"])
 
     def test_decode_docker_multiplexed_logs(self) -> None:
         frame = b"\x01\x00\x00\x00" + (6).to_bytes(4, "big") + b"hello\n"

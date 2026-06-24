@@ -139,7 +139,13 @@ under `instances/` for inspection and uses a Docker named volume for the running
 container. Starting or restarting an agent syncs local files into the runtime
 volume first. The Agent Editor also exposes manual sync actions for copying
 local files to the runtime volume or copying runtime changes back to local
-files.
+files under its advanced action menu.
+
+The same advanced action menu includes Matrix E2EE state reset. The reset action
+is refused while the agent container is running. When confirmed for a stopped
+agent, it removes `.zeroclaw/state/matrix/` from the agent state and rotates the
+agent's Matrix `device_id` override. Restart the agent afterwards so
+`config.toml` is rendered with the new device ID.
 
 The Proactive sidecar section can create one companion container per agent.
 The sidecar reads the agent's configured `host_port` and calls that agent's

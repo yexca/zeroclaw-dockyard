@@ -715,6 +715,34 @@ dd {
   backdrop-filter: blur(8px);
 }
 
+.advanced-action-cluster {
+  position: relative;
+  display: inline-flex;
+}
+
+.advanced-action-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.advanced-action-cluster.open .advanced-action-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .template-editor {
   display: grid;
   gap: 10px;
@@ -1027,24 +1055,30 @@ dd {
   pointer-events: none;
 }
 
-.notice {
-  display: flex;
+.toast.notice {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   min-width: 0;
-  padding: 10px 10px 10px 12px;
+  padding: 10px 10px 13px 12px;
   box-shadow: var(--shadow-panel);
   font-weight: 700;
   pointer-events: auto;
+  overflow: hidden;
 }
 
-.notice span {
+.toast.notice span {
+  position: relative;
+  z-index: 2;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .toast-close {
+  position: relative;
+  z-index: 2;
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -1059,6 +1093,31 @@ dd {
 
 .toast-close:hover {
   background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.toast-progress {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.45;
+  transform-origin: left center;
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
 }
 
 .history-panel {

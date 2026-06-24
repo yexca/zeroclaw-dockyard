@@ -296,6 +296,13 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 HISTORY.append("sync-from-runtime", agent_id=identifier, result=result)
                 success(self, 200, result)
                 return
+            if method == "POST" and action == "reset-matrix-state":
+                reset_result = DOCKER.reset_matrix_state(config, agent)
+                rotate_result = STORE.rotate_matrix_device_id(identifier)
+                result = {"runtime": reset_result, "config": rotate_result}
+                HISTORY.append("reset-matrix-state", agent_id=identifier, result=result)
+                success(self, 200, result)
+                return
             if method == "POST" and action == "export":
                 payload = self.read_optional_json()
                 formats = payload.get("formats") if isinstance(payload, dict) and isinstance(payload.get("formats"), list) else None

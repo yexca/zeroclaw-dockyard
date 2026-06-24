@@ -398,6 +398,8 @@ const state = {
   busy: false,
   notice: "",
   error: "",
+  noticeKind: "",
+  agentAdvancedActionsOpen: false,
   exportResult: null,
   validationResult: null,
   dashboardLoading: false,
@@ -412,6 +414,8 @@ const state = {
 
 let i18n;
 let themeController;
+let noticeTimer = null;
+let errorTimer = null;
 
 class FormValidationError extends Error {
   constructor(message, fieldName = "") {
@@ -697,17 +701,53 @@ function setBusy(busy) {
   render();
 }
 
+function clearToast(kind = "all") {
+  if (kind === "notice" || kind === "all") {
+    if (noticeTimer) window.clearTimeout(noticeTimer);
+    noticeTimer = null;
+    state.notice = "";
+    state.noticeKind = "";
+  }
+  if (kind === "error" || kind === "all") {
+    if (errorTimer) window.clearTimeout(errorTimer);
+    errorTimer = null;
+    state.error = "";
+  }
+}
+
+function showNotice(message, kind = "success") {
+  clearToast("notice");
+  state.notice = message || "";
+  state.noticeKind = kind;
+  if (state.notice) {
+    noticeTimer = window.setTimeout(() => {
+      clearToast("notice");
+      render();
+    }, 5000);
+  }
+}
+
+function showError(message) {
+  clearToast("error");
+  state.error = message || "";
+  if (state.error) {
+    errorTimer = window.setTimeout(() => {
+      clearToast("error");
+      render();
+    }, 20000);
+  }
+}
+
 async function runAction(action, successKey) {
   try {
     setBusy(true);
-    state.error = "";
-    state.notice = "";
+    clearToast();
     const result = await action();
-    state.notice = successKey ? t(successKey) : "";
+    if (successKey) showNotice(t(successKey));
     await refreshConfig(false);
     return result;
   } catch (error) {
-    state.error = error.message || String(error);
+    showError(error.message || String(error));
     return null;
   } finally {
     state.busy = false;
@@ -757,10 +797,10 @@ async function refreshDashboardInBackground() {
   if (visible) render();
   try {
     await refreshDashboard();
-    state.error = "";
+    clearToast("error");
   } catch (error) {
     state.dashboardRequested = false;
-    if (visible) state.error = error.message || String(error);
+    if (visible) showError(error.message || String(error));
   } finally {
     state.dashboardLoading = false;
     if (visible || state.selectedTab === "dashboard") render();
@@ -997,16 +1037,15 @@ async function runAiFill() {
   };
   try {
     setBusy(true);
-    state.error = "";
-    state.notice = "";
+    clearToast();
     const result = await api("/api/prompt-templates/ai-fill", { method: "POST", body: JSON.stringify(payload) });
     updateTemplateDraftFromForm();
     template.files = { ...templateFiles(template), ...(result.files || {}) };
     state.selectedTemplateFile = targetFiles[0] || state.selectedTemplateFile;
     state.aiFillOpen = false;
-    state.notice = t("messages.aiFillGenerated");
+    showNotice(t("messages.aiFillGenerated"));
   } catch (error) {
-    state.error = error.message || String(error);
+    showError(error.message || String(error));
   } finally {
     state.busy = false;
     render();
@@ -1119,11 +1158,16 @@ const ACTION_ICONS = {
   "actions.stop": "square",
   "actions.syncFromRuntime": "download",
   "actions.syncToRuntime": "upload",
-  "actions.validate": "circle-check"
+  "actions.validate": "circle-check",
+  "actions.advancedActions": "chevron-up",
+  "actions.collapseAdvancedActions": "chevron-down",
+  "actions.resetMatrixState": "shield-alert"
 };
 
 const ICON_PATHS = {
   check: '<path d="m5 12 4 4L19 6"></path>',
+  "chevron-down": '<path d="m6 9 6 6 6-6"></path>',
+  "chevron-up": '<path d="m18 15-6-6-6 6"></path>',
   "circle-check": '<circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path>',
@@ -1135,6 +1179,7 @@ const ICON_PATHS = {
   refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"></path><path d="M3 21v-5h5"></path><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"></path><path d="M21 3v5h-5"></path>',
   rotate: '<path d="M21 12a9 9 0 1 1-2.6-6.4"></path><path d="M21 3v6h-6"></path>',
   save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path>',
+  "shield-alert": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path>',
   sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"></path><path d="M5 3v4"></path><path d="M3 5h4"></path><path d="M19 17v4"></path><path d="M17 19h4"></path>',
   square: '<rect x="6" y="6" width="12" height="12" rx="2"></rect>',
   trash: '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
@@ -1177,18 +1222,20 @@ function render() {
 
 function renderNotices() {
   const loading = state.busy || (state.selectedTab === "dashboard" && state.dashboardLoading) ? renderNotice("muted", t("common.loading"), "status") : "";
-  const notice = state.notice ? renderNotice("success", state.notice, "status") : "";
+  const notice = state.notice ? renderNotice(state.noticeKind || "success", state.notice, "status") : "";
   const error = state.error ? renderNotice("danger", state.error, "alert") : "";
   const notices = `${loading}${notice}${error}`;
   return notices ? `<div class="toast-region" aria-live="polite">${notices}</div>` : "";
 }
 
 function renderNotice(kind, message, role) {
+  const duration = kind === "success" ? 5 : kind === "danger" ? 20 : 0;
   return `<div class="notice toast ${kind}" role="${role}">
     <span>${escapeHtml(message)}</span>
     <button type="button" class="toast-close" data-notice-dismiss title="${escapeHtml(t("actions.cancel"))}" aria-label="${escapeHtml(t("actions.cancel"))}">
       ${iconSvg("x")}
     </button>
+    ${duration ? `<i class="toast-progress" style="animation-duration:${duration}s"></i>` : ""}
   </div>`;
 }
 
@@ -1385,11 +1432,24 @@ function renderAgentForm(agent) {
       ${actionButton("agent-save", "actions.save", "primary")}
       ${actionButton("agent-validate", "actions.validate")}
       ${actionButton("agent-apply-template", "actions.applyTemplate", "secondary", !agent.prompt_template)}
-      ${actionButton("agent-sync-to-runtime", "actions.syncToRuntime")}
-      ${actionButton("agent-sync-from-runtime", "actions.syncFromRuntime")}
+      ${renderAgentAdvancedActions()}
     </div>
     ${renderValidation()}
   `;
+}
+
+function renderAgentAdvancedActions() {
+  return `<div class="advanced-action-cluster ${state.agentAdvancedActionsOpen ? "open" : ""}">
+    <div class="advanced-action-popover" aria-hidden="${state.agentAdvancedActionsOpen ? "false" : "true"}">
+      ${actionButton("agent-sync-to-runtime", "actions.syncToRuntime")}
+      ${actionButton("agent-sync-from-runtime", "actions.syncFromRuntime")}
+      ${actionButton("agent-reset-matrix-state", "actions.resetMatrixState", "danger")}
+    </div>
+    ${actionButton(
+      "agent-advanced-actions-toggle",
+      state.agentAdvancedActionsOpen ? "actions.collapseAdvancedActions" : "actions.advancedActions"
+    )}
+  </div>`;
 }
 
 function renderAgentPrimaryFields(agent) {
@@ -2046,6 +2106,11 @@ async function handleAction(action) {
     return;
   }
   if (action.startsWith("agent-delete:")) return deleteAgent(action.split(":")[1]);
+  if (action === "agent-advanced-actions-toggle") {
+    state.agentAdvancedActionsOpen = !state.agentAdvancedActionsOpen;
+    render();
+    return;
+  }
 
   if (action === "refresh-all-status") {
     return runAction(async () => {
@@ -2089,13 +2154,15 @@ async function handleAction(action) {
     const id = itemId(selectedAgent());
     try {
       setBusy(true);
-      state.error = "";
-      state.notice = "";
+      clearToast();
       state.validationResult = await api(`/api/agents/${encodeURIComponent(id)}/validate`, { method: "POST", body: "{}" });
-      state.notice = state.validationResult.valid ? t("messages.validationPassed") : "";
-      state.error = state.validationResult.valid ? "" : t("messages.validationFailed");
+      if (state.validationResult.valid) {
+        showNotice(t("messages.validationPassed"));
+      } else {
+        showError(t("messages.validationFailed"));
+      }
     } catch (error) {
-      state.error = error.message || String(error);
+      showError(error.message || String(error));
     } finally {
       state.busy = false;
       render();
@@ -2140,6 +2207,7 @@ async function handleAction(action) {
       await api(`/api/agents/${encodeURIComponent(id)}/${endpoint}`, { method: "POST", body: "{}" });
     }, successKey);
   }
+  if (action === "agent-reset-matrix-state") return resetMatrixState();
   if (action === "agent-delete-current") return deleteAgent(state.selectedAgentId);
 
   for (const kind of ["llm", "vision", "matrix", "mcp"]) {
@@ -2286,6 +2354,31 @@ async function deleteAgent(agentId) {
   }, "messages.deleted");
 }
 
+async function resetMatrixState() {
+  const agent = selectedAgent();
+  const agentId = itemId(agent);
+  if (!agentId) return;
+  try {
+    setBusy(true);
+    clearToast();
+    const status = await api(`/api/agents/${encodeURIComponent(agentId)}/status`);
+    state.agentStatuses[agentId] = status;
+    if (status.running) {
+      showError(t("messages.resetMatrixRunning"));
+      return;
+    }
+    if (!window.confirm(t("confirm.resetMatrixState"))) return;
+    await api(`/api/agents/${encodeURIComponent(agentId)}/reset-matrix-state`, { method: "POST", body: "{}" });
+    await refreshConfig(false);
+    showNotice(t("messages.resetMatrixState"));
+  } catch (error) {
+    showError(error.message || String(error));
+  } finally {
+    state.busy = false;
+    render();
+  }
+}
+
 async function deleteProfile(kind, id) {
   if (!id || !(await confirmDanger("confirm.deleteProfile"))) return;
   const item = collection(kind).find((profile) => itemId(profile) === id);
@@ -2319,8 +2412,7 @@ async function deleteTemplate(id) {
 function bindEvents() {
   document.addEventListener("click", async (event) => {
     if (event.target.closest("[data-notice-dismiss]")) {
-      state.error = "";
-      state.notice = "";
+      clearToast();
       render();
       return;
     }
@@ -2333,8 +2425,7 @@ function bindEvents() {
       } catch (_error) {
         // Tab persistence should never block the control surface.
       }
-      state.error = "";
-      state.notice = "";
+      clearToast();
       render();
       if (tab === "dashboard" && !state.dashboardRequested) {
         await refreshDashboardInBackground();
@@ -2435,7 +2526,7 @@ function configureAutoRefresh() {
       await Promise.all(Object.keys(state.agentLogs).map((agentId) => refreshAgentLogs(agentId)));
       render();
     } catch (error) {
-      state.error = error.message || String(error);
+      showError(error.message || String(error));
       render();
     }
   }, 10000);
@@ -2488,6 +2579,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  state.error = error.message || String(error);
+  showError(error.message || String(error));
   render();
 });

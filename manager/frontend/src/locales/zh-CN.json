@@ -123,6 +123,9 @@
     "restart": "重启",
     "syncToRuntime": "同步到运行卷",
     "syncFromRuntime": "从运行卷同步",
+    "advancedActions": "高级操作",
+    "collapseAdvancedActions": "收起高级操作",
+    "resetMatrixState": "重置 Matrix E2EE 状态",
     "logs": "日志",
     "downloadLogs": "下载日志",
     "refreshStatus": "刷新状态",
@@ -246,6 +249,8 @@
     "validationFailed": "校验失败。请查看下方详情。",
     "syncedToRuntime": "本地文件已同步到运行卷。",
     "syncedFromRuntime": "运行卷已同步回本地文件。",
+    "resetMatrixState": "Matrix E2EE 状态已重置，device_id 已更新。",
+    "resetMatrixRunning": "当前容器正在运行，请关闭后再试。",
     "started": "已请求启动。",
     "stopped": "已请求停止。",
     "restarted": "已请求重启。",
@@ -262,6 +267,7 @@
     "deleteProfile": "删除这个配置？已关联的智能体可能需要更新。",
     "deleteTemplate": "删除这个提示词模板？",
     "overwriteWorkspace": "覆盖现有工作区提示词文件？",
+    "resetMatrixState": "该行为将清除 Matrix 本地加密状态，并生成该 Matrix 配置的新 device_id。如果有其他 agent 正在使用同一个 Matrix 账号或配置，可能受到影响。是否继续？",
     "deleteTemplateFile": "移除这个自定义模板文件？"
   },
   "common": {

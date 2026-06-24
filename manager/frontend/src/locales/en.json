@@ -128,6 +128,9 @@
     "restart": "Restart",
     "syncToRuntime": "Sync to runtime",
     "syncFromRuntime": "Sync from runtime",
+    "advancedActions": "Advanced actions",
+    "collapseAdvancedActions": "Hide advanced actions",
+    "resetMatrixState": "Reset Matrix E2EE state",
     "logs": "Logs",
     "downloadLogs": "Download logs",
     "refreshStatus": "Refresh status",
@@ -251,6 +254,8 @@
     "validationFailed": "Validation failed. Review the details below.",
     "syncedToRuntime": "Local files synced to runtime volume.",
     "syncedFromRuntime": "Runtime volume synced back to local files.",
+    "resetMatrixState": "Matrix E2EE state reset and device ID rotated.",
+    "resetMatrixRunning": "Agent container is running. Stop it before resetting Matrix state.",
     "started": "Start requested.",
     "stopped": "Stop requested.",
     "restarted": "Restart requested.",
@@ -267,6 +272,7 @@
     "deleteProfile": "Delete this profile? Assigned agents may need updates.",
     "deleteTemplate": "Delete this prompt template?",
     "overwriteWorkspace": "Overwrite existing workspace prompt files?",
+    "resetMatrixState": "This will delete the local Matrix encryption state and generate a new device ID for this Matrix configuration. Other agents using the same Matrix account or configuration may be affected. Continue?",
     "deleteTemplateFile": "Remove this custom template file?"
   },
   "common": {

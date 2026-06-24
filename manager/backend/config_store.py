@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import shutil
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -289,6 +291,26 @@ class ConfigStore:
         agent = self.get_agent(identifier)
         return self.renderer.initialize_workspace(config, agent, mode=mode)
 
+    def rotate_matrix_device_id(self, identifier: str) -> dict[str, Any]:
+        config = self.load()
+        agents = config.get("agents") if isinstance(config.get("agents"), list) else []
+        index = self._find_index(agents, identifier)
+        if index is None:
+            raise ConfigError("not_found", "Agent was not found.", {"id": identifier}, 404)
+        agent = copy.deepcopy(agents[index])
+        matrix = agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {}
+        previous_device_id = matrix.get("device_id") if isinstance(matrix.get("device_id"), str) else ""
+        matrix["device_id"] = generate_matrix_device_id(identifier)
+        agent["matrix"] = matrix
+        agents[index] = agent
+        config["agents"] = agents
+        self.save(config)
+        return {
+            "agent": copy.deepcopy(agent),
+            "previous_device_id": previous_device_id,
+            "device_id": matrix["device_id"],
+        }
+
     def agent_workspace_initialized(self, config: dict[str, Any], agent: dict[str, Any]) -> bool:
         workspace = self.renderer.workspace_dir(config, agent)
         if not workspace.is_dir():
@@ -405,3 +427,10 @@ def redact(value: Any) -> Any:
 
 def to_json(data: Any) -> str:
     return json.dumps(redact(data), sort_keys=True, ensure_ascii=True)
+
+
+def generate_matrix_device_id(identifier: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9]+", "_", str(identifier).upper()).strip("_") or "AGENT"
+    safe = safe[:32]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"ZEROCLAW_{safe}_{stamp}"
