@@ -21,7 +21,7 @@ agent containers start until the WebUI creates them.
   operation history.
 - Agents: create, edit, validate, start, stop, restart, delete, export, and
   apply prompt templates.
-- Profiles: edit reusable LLM, Matrix, and MCP profiles.
+- Profiles: edit reusable LLM, Vision LLM, Matrix, and MCP profiles.
 - Prompt templates: edit workspace files that can be applied to agents.
 - Export: write redacted generated configuration under `config/generated/`.
 
@@ -99,6 +99,20 @@ settings, and Ollama context/output overrides.
 The frontend validates required strings, numeric ranges, URLs, and JSON fields
 before saving. Invalid fields are reported in a browser alert with the specific
 field name.
+
+## Vision LLM Profiles
+
+The Vision LLM Profiles view edits reusable image-attachment routes under
+`profiles.vision`. Agents can select one with `vision_profile`; leaving it
+empty disables the dedicated vision route for that agent. The manager renders
+the selected profile into a dedicated ZeroClaw provider and sets
+`multimodal.vision_model_provider`, so text-only default models can still hand
+image turns to a vision-capable model.
+
+Use the same provider family, base URL, model, wire API, timeout, and API key
+patterns as LLM profiles. The multimodal limits control how many images are
+kept in one request, maximum image size, how many recent turns keep image data,
+and whether http/https image URLs may be fetched remotely.
 
 ## Agents
 

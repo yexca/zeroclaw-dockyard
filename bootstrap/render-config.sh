@@ -146,14 +146,22 @@ MODEL_PROVIDER_NUM_CTX=$(first_nonempty "${MODEL_PROVIDER_NUM_CTX:-}" "")
 MODEL_PROVIDER_NUM_PREDICT=$(first_nonempty "${MODEL_PROVIDER_NUM_PREDICT:-}" "")
 MODEL_PROVIDER_TEMPERATURE_OVERRIDE=$(first_nonempty "${MODEL_PROVIDER_TEMPERATURE_OVERRIDE:-}" "")
 MODEL_PROVIDER_REF="${MODEL_PROVIDER_FAMILY}.${MODEL_PROVIDER_ALIAS}"
+VISION_ENABLED=$(first_nonempty "${VISION_ENABLED:-}" "true")
+VISION_PROVIDER_FAMILY=$(first_nonempty "${VISION_PROVIDER_FAMILY:-}" "custom")
+VISION_PROVIDER_ALIAS=$(first_nonempty "${VISION_PROVIDER_ALIAS:-}" "vision")
+VISION_PROVIDER_REF="${VISION_PROVIDER_FAMILY}.${VISION_PROVIDER_ALIAS}"
+VISION_TIMEOUT_SECS=$(first_nonempty "${VISION_TIMEOUT_SECS:-}" "120")
 SHELL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TIMEOUT_SECS:-}" "300")
 SHELL_TOOL_TIMEOUT_SECS=$(first_nonempty "${SHELL_TOOL_TIMEOUT_SECS:-}" "$SHELL_TIMEOUT_SECS")
 
 validate_provider_segment "MODEL_PROVIDER_FAMILY" "$MODEL_PROVIDER_FAMILY"
 validate_provider_segment "MODEL_PROVIDER_ALIAS" "$MODEL_PROVIDER_ALIAS"
+validate_provider_segment "VISION_PROVIDER_FAMILY" "$VISION_PROVIDER_FAMILY"
+validate_provider_segment "VISION_PROVIDER_ALIAS" "$VISION_PROVIDER_ALIAS"
 validate_unsigned_int "MODEL_PROVIDER_TIMEOUT_SECS" "$MODEL_PROVIDER_TIMEOUT_SECS"
 if [ -n "$MODEL_PROVIDER_MAX_TOKENS" ]; then validate_unsigned_int "MODEL_PROVIDER_MAX_TOKENS" "$MODEL_PROVIDER_MAX_TOKENS"; fi
 if [ -n "$MODEL_PROVIDER_NUM_CTX" ]; then validate_unsigned_int "MODEL_PROVIDER_NUM_CTX" "$MODEL_PROVIDER_NUM_CTX"; fi
+validate_unsigned_int "VISION_TIMEOUT_SECS" "$VISION_TIMEOUT_SECS"
 validate_unsigned_int "SHELL_TIMEOUT_SECS" "$SHELL_TIMEOUT_SECS"
 validate_unsigned_int "SHELL_TOOL_TIMEOUT_SECS" "$SHELL_TOOL_TIMEOUT_SECS"
 
@@ -258,18 +266,19 @@ EOF
 
 write_model_provider_block >> "$CONFIG_PATH"
 
+if [ "$(toml_bool "$VISION_ENABLED")" = "true" ]; then
 cat >> "$CONFIG_PATH" <<EOF
 
-[providers.models.custom.vision]
+[providers.models.${VISION_PROVIDER_FAMILY}.${VISION_PROVIDER_ALIAS}]
 uri = "$(toml_escape "${VISION_BASE_URL:-https://api.openai.com/v1}")"
 model = "$(toml_escape "${VISION_MODEL:-gpt-4o}")"
-api_key = "$(toml_escape "$(first_nonempty "${ZEROCLAW_providers__models__custom__vision__api_key:-}" "${ZEROCLAW_providers__models__openai__vision__api_key:-}")")"
+api_key = "$(toml_escape "$(first_nonempty "${ZEROCLAW_providers__models__custom__vision__api_key:-}" "${ZEROCLAW_providers__models__openai__vision__api_key:-}" "${OPENAI_API_KEY:-}")")"
 wire_api = "$(toml_escape "${VISION_WIRE_API:-chat_completions}")"
-timeout_secs = 120
+timeout_secs = ${VISION_TIMEOUT_SECS}
 
 [[model_routes]]
 hint = "vision"
-model_provider = "custom.vision"
+model_provider = "$(toml_escape "$VISION_PROVIDER_REF")"
 model = "$(toml_escape "${VISION_MODEL:-gpt-4o}")"
 
 [query_classification]
@@ -286,8 +295,23 @@ max_images = ${VISION_MAX_IMAGES:-4}
 max_image_size_mb = ${VISION_MAX_IMAGE_SIZE_MB:-5}
 max_image_turns = ${VISION_MAX_IMAGE_TURNS:-2}
 allow_remote_fetch = $(toml_bool "${VISION_ALLOW_REMOTE_FETCH:-false}")
-vision_model_provider = "custom.vision"
+vision_model_provider = "$(toml_escape "$VISION_PROVIDER_REF")"
 vision_model = "$(toml_escape "${VISION_MODEL:-gpt-4o}")"
+
+EOF
+else
+cat >> "$CONFIG_PATH" <<EOF
+
+[multimodal]
+max_images = ${VISION_MAX_IMAGES:-4}
+max_image_size_mb = ${VISION_MAX_IMAGE_SIZE_MB:-5}
+max_image_turns = ${VISION_MAX_IMAGE_TURNS:-2}
+allow_remote_fetch = $(toml_bool "${VISION_ALLOW_REMOTE_FETCH:-false}")
+
+EOF
+fi
+
+cat >> "$CONFIG_PATH" <<EOF
 
 [media_pipeline]
 enabled = true

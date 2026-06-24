@@ -40,15 +40,6 @@ defaults:
     multi_message_delay_ms: 800
     channel_debounce_ms: 0
 
-vision:
-  model: gpt-4o
-  base_url: https://api.openai.com/v1
-  wire_api: chat_completions
-  allow_remote_fetch: false
-  max_images: 4
-  max_image_size_mb: 5
-  max_image_turns: 2
-
 heartbeat:
   enabled: false
   interval_minutes: 30
@@ -94,6 +85,18 @@ profiles:
       provider_alias: flash
       model: gemini-2.5-flash
       timeout_secs: 120
+  vision:
+    - id: vision-default
+      provider_family: custom
+      provider_alias: vision
+      model: gpt-4o
+      base_url: https://api.openai.com/v1
+      wire_api: chat_completions
+      timeout_secs: 120
+      allow_remote_fetch: false
+      max_images: 4
+      max_image_size_mb: 5
+      max_image_turns: 2
   matrix:
     - id: matrix-default
       homeserver: https://matrix.example.com
@@ -134,6 +137,7 @@ agents:
     host_port: 42641
     image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: deepseek-text
+    vision_profile: vision-default
     matrix_profile: matrix-default
     mcp_profile: mcp-home
     prompt_template: default
@@ -158,6 +162,7 @@ agents:
     host_port: 42642
     image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: ollama-local
+    vision_profile: vision-default
     matrix_profile: matrix-default
     mcp_profile: mcp-home
     prompt_template: default
@@ -172,6 +177,7 @@ agents:
     host_port: 42643
     image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: gemini-flash
+    vision_profile: vision-default
     matrix_profile: matrix-default
     mcp_profile: mcp-home
     prompt_template: default

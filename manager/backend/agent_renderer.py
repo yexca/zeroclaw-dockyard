@@ -61,6 +61,18 @@ REQUIRED_ENV_KEYS = [
     "MCP_DEFERRED_LOADING",
     "MCP_TOOL_TIMEOUT_SECS",
     "MCP_GATEWAY_TOKEN",
+    "VISION_ENABLED",
+    "VISION_PROVIDER_FAMILY",
+    "VISION_PROVIDER_ALIAS",
+    "VISION_MODEL",
+    "VISION_BASE_URL",
+    "VISION_WIRE_API",
+    "VISION_TIMEOUT_SECS",
+    "VISION_ALLOW_REMOTE_FETCH",
+    "VISION_MAX_IMAGES",
+    "VISION_MAX_IMAGE_SIZE_MB",
+    "VISION_MAX_IMAGE_TURNS",
+    "ZEROCLAW_providers__models__custom__vision__api_key",
 ]
 
 
@@ -77,12 +89,14 @@ class AgentRenderer:
         resolved.setdefault("name", str(agent.get("name") or agent_identifier))
 
         llm = self._resolve_profile(config, "llm", agent.get("llm_profile"))
+        vision = self._resolve_profile(config, "vision", agent.get("vision_profile"), optional=True)
         matrix = self._resolve_profile(config, "matrix", agent.get("matrix_profile"))
         mcp = self._resolve_profile(config, "mcp", agent.get("mcp_profile"))
 
         defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
         matrix_defaults = defaults.get("matrix") if isinstance(defaults.get("matrix"), dict) else {}
         resolved["model"] = deep_merge(llm, agent.get("model") if isinstance(agent.get("model"), dict) else {})
+        resolved["vision"] = deep_merge(vision, agent.get("vision") if isinstance(agent.get("vision"), dict) else {})
         resolved["matrix"] = deep_merge(deep_merge(matrix_defaults, matrix), agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {})
         resolved["mcp"] = deep_merge(mcp, agent.get("mcp") if isinstance(agent.get("mcp"), dict) else {})
         if "prompt_template" not in resolved and agent.get("template"):
@@ -92,14 +106,17 @@ class AgentRenderer:
     def render_env(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, str]:
         resolved = self.resolve_agent(config, agent)
         docker_config = config.get("docker") if isinstance(config.get("docker"), dict) else {}
-        vision = config.get("vision") if isinstance(config.get("vision"), dict) else {}
         runtime = config.get("runtime") if isinstance(config.get("runtime"), dict) else {}
         heartbeat = config.get("heartbeat") if isinstance(config.get("heartbeat"), dict) else {}
         pacing = config.get("pacing") if isinstance(config.get("pacing"), dict) else {}
         model = resolved.get("model") if isinstance(resolved.get("model"), dict) else {}
+        vision = resolved.get("vision") if isinstance(resolved.get("vision"), dict) else {}
         matrix = resolved.get("matrix") if isinstance(resolved.get("matrix"), dict) else {}
         mcp = resolved.get("mcp") if isinstance(resolved.get("mcp"), dict) else {}
         agent_name = str(resolved.get("name") or resolved.get("id"))
+        vision_family = vision.get("provider_family") or vision.get("family") or "custom"
+        vision_alias = vision.get("provider_alias") or vision.get("alias") or "vision"
+        vision_api_key = vision.get("api_key") or ""
 
         env: dict[str, str] = {
             "LANG": "C.UTF-8",
@@ -166,15 +183,19 @@ class AgentRenderer:
             "MCP_DEFERRED_LOADING": env_value(mcp.get("deferred_loading", True)),
             "MCP_TOOL_TIMEOUT_SECS": env_value(mcp.get("tool_timeout_secs") or 120),
             "MCP_GATEWAY_TOKEN": env_value(mcp.get("gateway_token") or ""),
+            "VISION_ENABLED": env_value(bool(vision)),
+            "VISION_PROVIDER_FAMILY": env_value(vision_family),
+            "VISION_PROVIDER_ALIAS": env_value(vision_alias),
             "VISION_MODEL": env_value(vision.get("model") or "gpt-4o"),
             "VISION_BASE_URL": env_value(vision.get("base_url") or "https://api.openai.com/v1"),
             "VISION_WIRE_API": env_value(vision.get("wire_api") or "chat_completions"),
+            "VISION_TIMEOUT_SECS": env_value(vision.get("timeout_secs") or 120),
             "VISION_ALLOW_REMOTE_FETCH": env_value(vision.get("allow_remote_fetch", False)),
             "VISION_MAX_IMAGES": env_value(vision.get("max_images") or 4),
             "VISION_MAX_IMAGE_SIZE_MB": env_value(vision.get("max_image_size_mb") or 5),
             "VISION_MAX_IMAGE_TURNS": env_value(vision.get("max_image_turns") or 2),
-            "ZEROCLAW_providers__models__custom__vision__api_key": env_value(vision.get("api_key") or ""),
-            "OPENAI_API_KEY": env_value(vision.get("api_key") or ""),
+            "ZEROCLAW_providers__models__custom__vision__api_key": env_value(vision_api_key),
+            "OPENAI_API_KEY": env_value(vision_api_key),
             "OPENAI_BASE_URL": env_value(vision.get("base_url") or "https://api.openai.com/v1"),
             "HEARTBEAT_ENABLED": env_value(heartbeat.get("enabled", False)),
             "HEARTBEAT_INTERVAL_MINUTES": env_value(heartbeat.get("interval_minutes") or 30),
@@ -301,11 +322,11 @@ class AgentRenderer:
             raise ConfigError("not_found", "Prompt template was not found.", {"id": template_id}, 404)
         return None
 
-    def _resolve_profile(self, config: dict[str, Any], kind: str, profile_id: Any) -> dict[str, Any]:
-        if not profile_id:
-            return {}
+    def _resolve_profile(self, config: dict[str, Any], kind: str, profile_id: Any, optional: bool = False) -> dict[str, Any]:
         profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
         collection = profiles.get(kind) if isinstance(profiles.get(kind), list) else []
+        if not profile_id:
+            return {}
         for profile in collection:
             if isinstance(profile, dict) and item_id(profile) == str(profile_id):
                 return copy.deepcopy(profile)
@@ -373,7 +394,9 @@ def is_secret_key(key: str) -> bool:
 
 def render_config_toml_preview(env: dict[str, str]) -> str:
     provider_ref = f"{env.get('MODEL_PROVIDER_FAMILY', 'deepseek')}.{env.get('MODEL_PROVIDER_ALIAS', 'text')}"
+    vision_provider_ref = f"{env.get('VISION_PROVIDER_FAMILY', 'custom')}.{env.get('VISION_PROVIDER_ALIAS', 'vision')}"
     provider_block = render_provider_toml_lines(env)
+    vision_block = render_vision_preview_block(env, vision_provider_ref)
     return f"""schema_version = 3
 workspace_dir = "{toml_escape(env.get('ZEROCLAW_AGENT_WORKSPACE', '/zeroclaw-data/workspace'))}"
 config_path = "{toml_escape(env.get('ZEROCLAW_CONFIG_DIR', '/zeroclaw-data/.zeroclaw'))}/config.toml"
@@ -382,6 +405,7 @@ default_model = "{toml_escape(env.get('MODEL_PROVIDER_MODEL', 'deepseek-chat'))}
 
 [providers.models.{env.get('MODEL_PROVIDER_FAMILY', 'deepseek')}.{env.get('MODEL_PROVIDER_ALIAS', 'text')}]
 {provider_block}
+{vision_block}
 
 [channels.matrix.home]
 enabled = true
@@ -497,6 +521,42 @@ def render_provider_toml_lines(env: dict[str, str]) -> str:
         if value and (key in {"native_tools", "think"} or toml_bool(value) == "true"):
             lines.append(f"{key} = {toml_bool(value)}")
     return "\n".join(lines)
+
+
+def render_vision_toml_lines(env: dict[str, str]) -> str:
+    lines = [
+        f'model = "{toml_escape(env.get("VISION_MODEL", "gpt-4o"))}"',
+    ]
+    if env.get("VISION_BASE_URL"):
+        lines.append(f'uri = "{toml_escape(env.get("VISION_BASE_URL", ""))}"')
+    if env.get("ZEROCLAW_providers__models__custom__vision__api_key"):
+        lines.append(f'api_key = "{toml_escape(env.get("ZEROCLAW_providers__models__custom__vision__api_key", ""))}"')
+    if env.get("VISION_WIRE_API"):
+        lines.append(f'wire_api = "{toml_escape(env.get("VISION_WIRE_API", ""))}"')
+    lines.append(f'timeout_secs = {env.get("VISION_TIMEOUT_SECS", "120")}')
+    return "\n".join(lines)
+
+
+def render_vision_preview_block(env: dict[str, str], vision_provider_ref: str) -> str:
+    multimodal_limits = f"""
+[multimodal]
+max_images = {env.get('VISION_MAX_IMAGES', '4')}
+max_image_size_mb = {env.get('VISION_MAX_IMAGE_SIZE_MB', '5')}
+max_image_turns = {env.get('VISION_MAX_IMAGE_TURNS', '2')}
+allow_remote_fetch = {toml_bool(env.get('VISION_ALLOW_REMOTE_FETCH', 'false'))}"""
+    if toml_bool(env.get("VISION_ENABLED", "true")) != "true":
+        return multimodal_limits
+    return f"""
+[providers.models.{env.get('VISION_PROVIDER_FAMILY', 'custom')}.{env.get('VISION_PROVIDER_ALIAS', 'vision')}]
+{render_vision_toml_lines(env)}
+
+[[model_routes]]
+hint = "vision"
+model_provider = "{toml_escape(vision_provider_ref)}"
+model = "{toml_escape(env.get('VISION_MODEL', 'gpt-4o'))}"
+{multimodal_limits}
+vision_model_provider = "{toml_escape(vision_provider_ref)}"
+vision_model = "{toml_escape(env.get('VISION_MODEL', 'gpt-4o'))}"""
 
 
 def toml_inline(value: Any) -> str:

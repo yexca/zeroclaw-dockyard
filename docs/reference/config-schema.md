@@ -13,15 +13,40 @@ Primary config is YAML. The manager reads `config/manager.yaml` locally, or
   runtime network, Matrix host IP, and optional runtime storage settings.
 - `paths`: container paths plus optional host paths for Docker bind mounts.
 - `defaults`: shared image and Matrix defaults.
-- `vision`: shared vision model route.
 - `heartbeat`: built-in ZeroClaw heartbeat settings.
 - `pacing`: loop detection settings.
 - `runtime`: shell/tool timeout settings.
 - `profiles.llm`: reusable LLM provider profiles.
+- `profiles.vision`: reusable vision-capable LLM profiles.
 - `profiles.matrix`: reusable Matrix profiles.
 - `profiles.mcp`: reusable MCP profiles.
 - `prompt_templates`: reusable workspace prompt files.
 - `agents`: per-agent definitions.
+
+## Vision LLM Profile Fields
+
+`profiles.vision` entries define reusable image-attachment routes rendered into
+ZeroClaw's `[multimodal]` config. Agents select one with `vision_profile`; if
+an agent leaves it empty, no dedicated vision route is written. Older configs
+with a top-level `vision` object are still normalized into `profiles.vision`
+for compatibility.
+
+- `provider_family`, `provider_alias`: provider ref rendered as
+  `[providers.models.<family>.<alias>]` and assigned to
+  `multimodal.vision_model_provider`.
+- `model`: provider-local vision-capable model ID.
+- `base_url`: endpoint URL, rendered to ZeroClaw's `uri` field.
+- `wire_api`: request protocol such as `chat_completions` or `responses`.
+- `timeout_secs`: request timeout in seconds.
+- `api_key`: optional provider credential. Prefer storing it in
+  `config/secrets.yaml` for local deployments.
+- `allow_remote_fetch`: allow ZeroClaw to fetch http/https image URLs.
+- `max_images`: maximum images retained per provider request. Runtime clamps
+  this to `1..16`.
+- `max_image_size_mb`: maximum image payload before base64 encoding. Runtime
+  clamps this to `1..20`.
+- `max_image_turns`: maximum age of user images in conversation turns. `0`
+  disables age trimming.
 
 ## Agent Fields
 
@@ -33,7 +58,9 @@ Common agent fields:
 - `host_port`: loopback gateway port.
 - `image`: Docker image for this agent. The WebUI fills the current default
   ZeroClaw image.
-- `llm_profile`, `matrix_profile`, `mcp_profile`: profile references.
+- `llm_profile`, `vision_profile`, `matrix_profile`, `mcp_profile`: profile
+  references. `vision_profile` is optional; when empty, image routing is
+  disabled for the agent.
 - `prompt_template`: workspace template reference.
 - `matrix.external_peers`: required per-agent peer group members. Matrix
   identity, credentials, rooms, and channel behavior should live in the

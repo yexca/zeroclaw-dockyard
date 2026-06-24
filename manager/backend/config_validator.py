@@ -31,6 +31,7 @@ class ConfigValidator:
         agents = config.get("agents") if isinstance(config.get("agents"), list) else []
 
         self._validate_server(config, errors, warnings)
+        self._validate_vision_profiles(config, errors, warnings)
         self._validate_gitignore(errors, warnings)
         self._validate_agent_names(agents, errors)
 
@@ -161,6 +162,44 @@ class ConfigValidator:
         bind_host = str(server.get("bind_host") or "127.0.0.1")
         if bind_host not in {"127.0.0.1", "localhost", "::1"}:
             warnings.append(issue("non_loopback_bind", "server.bind_host", "WebUI should bind to loopback for local-only use.", {"bind_host": bind_host}))
+
+    def _validate_vision_profiles(self, config: dict[str, Any], errors: list[dict[str, Any]], warnings: list[dict[str, Any]]) -> None:
+        profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
+        visions = profiles.get("vision") if isinstance(profiles.get("vision"), list) else []
+        for index, vision in enumerate(visions):
+            if isinstance(vision, dict):
+                self._validate_vision_profile(vision, f"profiles.vision[{index}]", errors, warnings)
+
+    def _validate_vision_profile(self, vision: dict[str, Any], prefix: str, errors: list[dict[str, Any]], warnings: list[dict[str, Any]]) -> None:
+        provider_family = str(vision.get("provider_family") or vision.get("family") or "custom")
+        provider_alias = str(vision.get("provider_alias") or vision.get("alias") or "vision")
+        if not re.match(r"^[A-Za-z0-9_-]+$", provider_family):
+            errors.append(issue("invalid_vision_provider_family", f"{prefix}.provider_family", "Vision provider family must contain only letters, numbers, underscores, or hyphens."))
+        if not re.match(r"^[A-Za-z0-9_-]+$", provider_alias):
+            errors.append(issue("invalid_vision_provider_alias", f"{prefix}.provider_alias", "Vision provider alias must contain only letters, numbers, underscores, or hyphens."))
+        if not string_value(vision.get("model")):
+            errors.append(issue("missing_vision_model", f"{prefix}.model", "Vision model must be non-empty."))
+        base_url = str(vision.get("base_url") or "")
+        if base_url and not is_http_url(base_url):
+            errors.append(issue("invalid_vision_base_url", f"{prefix}.base_url", "Vision base URL must be a valid http/https URL."))
+        if not string_value(vision.get("wire_api")):
+            errors.append(issue("missing_vision_wire_api", f"{prefix}.wire_api", "Vision wire API must be non-empty."))
+        for key, minimum, maximum in (
+            ("timeout_secs", 1, None),
+            ("max_images", 1, 16),
+            ("max_image_size_mb", 1, 20),
+            ("max_image_turns", 0, None),
+        ):
+            value = vision.get(key)
+            if value is None:
+                continue
+            if not isinstance(value, int) or value < minimum or (maximum is not None and value > maximum):
+                message = f"vision.{key} must be an integer greater than or equal to {minimum}."
+                if maximum is not None:
+                    message = f"vision.{key} must be an integer from {minimum} to {maximum}."
+                errors.append(issue("invalid_vision_number", f"{prefix}.{key}", message, {"value": value}))
+        if provider_family.lower() not in LOCAL_API_KEY_OPTIONAL and not string_value(vision.get("api_key")):
+            warnings.append(issue("missing_vision_api_key", f"{prefix}.api_key", "Vision provider usually requires an API key; configure one before sending image attachments.", {"provider_family": provider_family}))
 
     def _validate_gitignore(self, errors: list[dict[str, Any]], warnings: list[dict[str, Any]]) -> None:
         gitignore = self.project_root / ".gitignore"

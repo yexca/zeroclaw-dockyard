@@ -297,7 +297,7 @@ Update this file as you evolve. Your identity is yours to shape.
 (Track unfinished tasks and follow-ups here)
 `
 };
-const TABS = ["dashboard", "agents", "llm", "matrix", "mcp", "prompts", "export"];
+const TABS = ["dashboard", "agents", "llm", "vision", "matrix", "mcp", "prompts", "export"];
 const DEFAULT_TAB = "agents";
 const SECRET_KEYS = ["api_key", "token", "password", "recovery_key", "secret"];
 const LLM_PRESETS = {
@@ -564,6 +564,7 @@ function fieldDisplayName(name) {
     host_port: t("fields.hostPort"),
     matrix_external_peers: t("fields.externalPeers"),
     llm_profile: t("fields.llmProfile"),
+    vision_profile: t("fields.visionProfile"),
     matrix_profile: t("fields.matrixProfile"),
     proactive_random_min_minutes: t("fields.proactiveRandomMinMinutes"),
     proactive_random_max_minutes: t("fields.proactiveRandomMaxMinutes"),
@@ -585,6 +586,9 @@ function fieldDisplayName(name) {
     num_ctx: t("fields.numCtx"),
     num_predict: t("fields.numPredict"),
     temperature_override: t("fields.temperatureOverride"),
+    max_images: t("fields.maxImages"),
+    max_image_size_mb: t("fields.maxImageSizeMb"),
+    max_image_turns: t("fields.maxImageTurns"),
     homeserver: t("fields.homeserver"),
     user_id: t("fields.matrixUser"),
     device_id: t("fields.deviceId"),
@@ -902,7 +906,6 @@ function nextAgentHostPort() {
 function defaultAgent(id) {
   return {
     id,
-    enabled: true,
     host_port: nextAgentHostPort(),
     image: DEFAULT_ZEROCLAW_IMAGE,
     matrix: {},
@@ -1007,6 +1010,20 @@ function llmFamily(item) {
 
 function createLlmProfile(id) {
   return { id, ...LLM_PRESETS.openai, _draft: true };
+}
+
+function createVisionProfile(id) {
+  return {
+    id,
+    ...LLM_PRESETS.custom,
+    provider_alias: "vision",
+    model: "gpt-4o",
+    max_images: 4,
+    max_image_size_mb: 5,
+    max_image_turns: 2,
+    allow_remote_fetch: false,
+    _draft: true
+  };
 }
 
 function applyLlmPresetToEmptyFields(item, family) {
@@ -1171,6 +1188,7 @@ function renderSelectedTab() {
   if (state.selectedTab === "dashboard") return renderDashboard();
   if (state.selectedTab === "agents") return renderAgentEditor();
   if (state.selectedTab === "llm") return renderProfileManager("llm");
+  if (state.selectedTab === "vision") return renderProfileManager("vision");
   if (state.selectedTab === "matrix") return renderProfileManager("matrix");
   if (state.selectedTab === "mcp") return renderProfileManager("mcp");
   if (state.selectedTab === "prompts") return renderPromptTemplates();
@@ -1373,6 +1391,7 @@ function renderAgentPrimaryFields(agent) {
       ${field("fields.id", "id", itemId(agent), "required", "fieldHelp.agent.id")}
       ${field("fields.hostPort", "host_port", hostPort, 'type="number" min="1" max="65535" required', "fieldHelp.agent.hostPort")}
       ${selectField("fields.llmProfile", "llm_profile", optionList(collection("llm"), agent.llm_profile, "common.none"), "required", "fieldHelp.agent.llmProfile")}
+      ${selectField("fields.visionProfile", "vision_profile", optionList(collection("vision"), agent.vision_profile, "common.none"), "", "fieldHelp.agent.visionProfile")}
       ${selectField(
         "fields.matrixProfile",
         "matrix_profile",
@@ -1471,6 +1490,31 @@ function renderProfileManager(kind) {
 }
 
 function renderProfileForm(kind, item) {
+  if (kind === "vision") {
+    const profile = applyLlmPresetToEmptyFields(item, llmFamily(item));
+    return `
+      <div class="form-grid">
+        ${field("fields.id", "id", itemId(item), "required")}
+        ${selectField("fields.provider", "provider_family", llmProviderOptions(profile.provider_family || "custom"), 'required data-llm-provider="true"', "fieldHelp.vision.provider")}
+        ${field("fields.providerAlias", "provider_alias", profile.provider_alias || profile.alias || "vision", "required", "fieldHelp.vision.providerAlias")}
+        ${field("fields.baseUrl", "base_url", profile.base_url || "", "required", "fieldHelp.vision.baseUrl")}
+        ${field("fields.model", "model", profile.model || "", "required", "fieldHelp.vision.model")}
+        ${selectField("fields.wireApi", "wire_api", wireApiOptions(profile.wire_api || "chat_completions"), "required", "fieldHelp.vision.wireApi")}
+        ${field("fields.timeout", "timeout_secs", profile.timeout_secs ?? 120, 'type="number" min="1" required', "fieldHelp.vision.timeout")}
+        ${passwordField("fields.apiKey", "api_key", profile.api_key || "", "fieldHelp.vision.apiKey")}
+      </div>
+      <details class="advanced-panel">
+        <summary>${escapeHtml(t("fields.multimodalLimits"))}</summary>
+        <div class="form-grid">
+          ${field("fields.maxImages", "max_images", profile.max_images ?? 4, 'type="number" min="1" max="16"', "fieldHelp.vision.maxImages")}
+          ${field("fields.maxImageSizeMb", "max_image_size_mb", profile.max_image_size_mb ?? 5, 'type="number" min="1" max="20"', "fieldHelp.vision.maxImageSizeMb")}
+          ${field("fields.maxImageTurns", "max_image_turns", profile.max_image_turns ?? 2, 'type="number" min="0"', "fieldHelp.vision.maxImageTurns")}
+          ${checkboxField("fields.allowRemoteFetch", "allow_remote_fetch", profile.allow_remote_fetch === true, "fieldHelp.vision.allowRemoteFetch")}
+        </div>
+      </details>
+      <div class="button-row form-actions">${actionButton("profile-save", "actions.save", "primary")}</div>
+    `;
+  }
   if (kind === "llm") {
     const profile = applyLlmPresetToEmptyFields(item, llmFamily(item));
     const family = llmFamily(profile);
@@ -1800,6 +1844,7 @@ function agentFromForm(form) {
     host_port: requireNumber(data, "host_port", { min: 1, max: 65535 }),
     image: String(data.get("image") || "").trim(),
     llm_profile: requireString(data, "llm_profile"),
+    vision_profile: String(data.get("vision_profile") || ""),
     matrix_profile: requireString(data, "matrix_profile"),
     mcp_profile: String(data.get("mcp_profile") || ""),
     prompt_template: String(data.get("prompt_template") || ""),
@@ -1862,6 +1907,24 @@ function profileFromForm(kind, form) {
       num_ctx: parseOptionalNumber(data.get("num_ctx"), fieldDisplayName("num_ctx"), { min: 1 }),
       num_predict: parseOptionalNumber(data.get("num_predict"), fieldDisplayName("num_predict")),
       temperature_override: parseOptionalFloat(data.get("temperature_override"), fieldDisplayName("temperature_override"), { min: 0, max: 2 })
+    });
+  }
+  if (kind === "vision") {
+    const family = requireString(data, "provider_family");
+    return cleanEmptyValues({
+      ...base,
+      id: requireString(data, "id"),
+      provider_family: family,
+      provider_alias: requireString(data, "provider_alias"),
+      base_url: validateUrlLike(data.get("base_url"), "base_url", { required: true }),
+      model: requireString(data, "model"),
+      wire_api: requireString(data, "wire_api"),
+      timeout_secs: requireNumber(data, "timeout_secs", { min: 1 }),
+      api_key: keepSecret(data, "api_key", current.api_key),
+      allow_remote_fetch: data.get("allow_remote_fetch") === "on",
+      max_images: requireNumber(data, "max_images", { min: 1, max: 16 }),
+      max_image_size_mb: requireNumber(data, "max_image_size_mb", { min: 1, max: 20 }),
+      max_image_turns: requireNumber(data, "max_image_turns", { min: 0 })
     });
   }
   if (kind === "matrix") {
@@ -2070,9 +2133,14 @@ async function handleAction(action) {
   }
   if (action === "agent-delete-current") return deleteAgent(state.selectedAgentId);
 
-  for (const kind of ["llm", "matrix", "mcp"]) {
+  for (const kind of ["llm", "vision", "matrix", "mcp"]) {
     if (action === `${kind}-new`) {
-      const item = kind === "llm" ? createLlmProfile(nextId(kind, collection(kind))) : { id: nextId(kind, collection(kind)), _draft: true };
+      const item =
+        kind === "llm"
+          ? createLlmProfile(nextId(kind, collection(kind)))
+          : kind === "vision"
+            ? createVisionProfile(nextId("vision", collection(kind)))
+            : { id: nextId(kind, collection(kind)), _draft: true };
       state.config.profiles[kind].unshift(item);
       state[`selected${kind}Id`] = item.id;
       render();
@@ -2263,7 +2331,7 @@ function bindEvents() {
       return;
     }
 
-    for (const kind of ["agents", "llm", "matrix", "mcp", "templates"]) {
+    for (const kind of ["agents", "llm", "vision", "matrix", "mcp", "templates"]) {
       const selector = event.target.closest(`[data-select-${kind}]`);
       if (selector) {
         const value = selector.dataset[`select${kind[0].toUpperCase()}${kind.slice(1)}`];

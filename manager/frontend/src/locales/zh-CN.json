@@ -27,7 +27,8 @@
     "matrix": "Matrix 配置",
     "mcp": "MCP 配置",
     "prompts": "提示词模板",
-    "export": "导出"
+    "export": "导出",
+    "vision": "Vision LLM 配置"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -218,7 +219,13 @@
     "proactiveTimezone": "时区",
     "proactiveChannel": "Matrix 频道",
     "proactiveAgentUrl": "网关 URL 覆盖",
-    "proactivePrompt": "Proactive 唤醒提示词"
+    "proactivePrompt": "Proactive 唤醒提示词",
+    "multimodalLimits": "多模态限制",
+    "maxImages": "最大图片数",
+    "maxImageSizeMb": "最大图片大小 MB",
+    "maxImageTurns": "保留图片回合数",
+    "allowRemoteFetch": "允许远程图片抓取",
+    "visionProfile": "Vision LLM 配置"
   },
   "templateApply": {
     "keep": "保留现有文件",
@@ -266,7 +273,8 @@
     "enabled": "已启用",
     "disabled": "已禁用",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "default": "默认"
   },
   "status": {
     "status": "状态",
@@ -301,7 +309,8 @@
       "proactiveTimezone": "免打扰时段使用的时区，例如 Asia/Tokyo。",
       "proactiveChannel": "传给 send_message_to_peer 的 Matrix channel alias。默认是 matrix.home。",
       "proactiveAgentUrl": "高级完整网关 URL。留空时自动使用此 agent 的 host port 和 /webhook?agent=<id>。",
-      "proactivePrompt": "可选的唤醒提示词覆盖。留空时使用内置的 PROACTIVE.md 导向提示词。"
+      "proactivePrompt": "可选的唤醒提示词覆盖。留空时使用内置的 PROACTIVE.md 导向提示词。",
+      "visionProfile": "可选的视觉模型配置，用于图片附件。留空时不为此 agent 启用专用视觉路由。"
     },
     "matrix": {
       "id": "可复用的配置 ID，智能体通过它选择 Matrix 配置。",
@@ -325,6 +334,24 @@
       "replyMinIntervalSecs": "每个 Matrix 接收者的出站回复最小间隔。0 表示禁用节流。",
       "replyQueueDepthMax": "启用节流时最多排队的出站回复数。0 使用运行时默认值。",
       "hostIp": "暴露给智能体容器的 matrix-host IP；通常继承 Docker 设置。"
+    },
+    "vision": {
+      "provider": "视觉路由使用的 ZeroClaw provider family，例如 openai、gemini、ollama 或 custom。",
+      "providerAlias": "生成 providers.models 配置时使用的别名，会和 provider family 组成 vision_model_provider 引用。",
+      "baseUrl": "视觉 provider 的 HTTP endpoint。OpenAI-compatible 服务需要按要求包含 /v1 等 API 前缀。",
+      "model": "图片回合被路由到视觉 provider 时使用的模型 ID。",
+      "wireApi": "视觉 provider 使用的请求协议。",
+      "timeout": "视觉 provider 的请求超时时间。",
+      "apiKey": "视觉 provider 凭据；本地模型或外部认证流程可留空。",
+      "maxImages": "单次请求中保留的最大图片附件数。ZeroClaw 会限制在 1-16。",
+      "maxImageSizeMb": "base64 编码前的最大图片大小。ZeroClaw 会限制在 1-20 MB。",
+      "maxImageTurns": "最近多少个对话回合保留图片数据。0 表示不按年龄裁剪。",
+      "allowRemoteFetch": "允许 ZeroClaw 抓取 http/https 图片 URL。本地文件和 Matrix 附件不需要开启。"
     }
+  },
+  "vision": {
+    "title": "Vision LLM 配置",
+    "subtitle": "用于图片附件和多模态回合的可复用视觉模型配置。",
+    "empty": "创建或选择一个 Vision LLM 配置。"
   }
 }

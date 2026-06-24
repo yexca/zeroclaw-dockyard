@@ -213,7 +213,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
         kind = "prompt_templates" if group == "prompt_templates" else segments[0]
         remaining = segments if group == "prompt_templates" else segments[1:]
 
-        if kind not in {"llm", "matrix", "mcp", "prompt_templates"}:
+        if kind not in {"llm", "vision", "matrix", "mcp", "prompt_templates"}:
             error_response(self, 404, "not_found", "Collection was not found.", {"kind": kind})
             return
 

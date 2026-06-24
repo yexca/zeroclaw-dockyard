@@ -24,6 +24,7 @@
     "dashboard": "Dashboard",
     "agents": "Agents",
     "llm": "LLM Profiles",
+    "vision": "Vision LLM Profiles",
     "matrix": "Matrix Profiles",
     "mcp": "MCP Profiles",
     "prompts": "Prompt Templates",
@@ -64,6 +65,11 @@
     "title": "LLM Profiles",
     "subtitle": "Provider profile pool for model access and request behavior.",
     "empty": "Create or select an LLM profile."
+  },
+  "vision": {
+    "title": "Vision LLM Profiles",
+    "subtitle": "Reusable vision-capable model profiles for image attachments and multimodal turns.",
+    "empty": "Create or select a Vision LLM profile."
   },
   "matrix": {
     "title": "Matrix Profiles",
@@ -148,6 +154,7 @@
     "dockerImage": "Docker image",
     "enabled": "Enabled",
     "llmProfile": "LLM profile",
+    "visionProfile": "Vision LLM profile",
     "matrixProfile": "Matrix profile",
     "mcpProfile": "MCP profile",
     "promptTemplate": "Prompt template",
@@ -184,6 +191,11 @@
     "numCtx": "Ollama num_ctx",
     "numPredict": "Ollama num_predict",
     "temperatureOverride": "Ollama temperature override",
+    "multimodalLimits": "Multimodal limits",
+    "maxImages": "Max images",
+    "maxImageSizeMb": "Max image size MB",
+    "maxImageTurns": "Max image turns",
+    "allowRemoteFetch": "Allow remote image fetch",
     "homeserver": "Homeserver",
     "allowedRooms": "Allowed rooms",
     "mentionOnly": "Mention only",
@@ -265,6 +277,7 @@
     "unnamed": "Unnamed",
     "enabled": "Enabled",
     "disabled": "Disabled",
+    "default": "Default",
     "yes": "Yes",
     "no": "No"
   },
@@ -284,6 +297,7 @@
       "id": "Manager-local agent ID. Used for generated container labels, instance directories, and API routes.",
       "hostPort": "Loopback port on the host that maps to this agent's ZeroClaw gateway.",
       "llmProfile": "Required model provider profile. Edit model credentials and provider behavior in LLM Profiles.",
+      "visionProfile": "Optional vision-capable model profile for image attachments. Leave empty to disable the dedicated vision route for this agent.",
       "matrixProfile": "Required Matrix profile. Matrix user, device, password, token, rooms, and behavior are controlled there.",
       "promptTemplate": "Workspace prompt template to apply to this agent's instance directory.",
       "name": "Optional display/container name. Leave blank to use the ID.",
@@ -325,6 +339,19 @@
       "replyMinIntervalSecs": "Outbound pacing floor per Matrix recipient. 0 disables pacing.",
       "replyQueueDepthMax": "Maximum queued outbound replies when pacing is active. 0 uses the runtime default.",
       "hostIp": "Host IP exposed to agent containers as matrix-host; usually inherited from Docker settings."
+    },
+    "vision": {
+      "provider": "ZeroClaw provider family for the vision route, such as openai, gemini, ollama, or custom.",
+      "providerAlias": "Alias used in the generated providers.models section. Together with provider family this forms the vision_model_provider ref.",
+      "baseUrl": "HTTP endpoint for the vision provider. For OpenAI-compatible providers, include the API prefix such as /v1 when required.",
+      "model": "Provider-local model ID used when ZeroClaw routes image turns to the vision provider.",
+      "wireApi": "Request protocol used by the vision provider.",
+      "timeout": "Request timeout for the vision provider.",
+      "apiKey": "Credential for the vision provider. Leave blank only for local providers or external auth flows.",
+      "maxImages": "Maximum number of image attachments preserved in one provider request. ZeroClaw clamps this to 1-16.",
+      "maxImageSizeMb": "Maximum image payload size before base64 encoding. ZeroClaw clamps this to 1-20 MB.",
+      "maxImageTurns": "How many recent conversation turns keep image data. Use 0 to disable age trimming.",
+      "allowRemoteFetch": "Allow ZeroClaw to fetch http/https image URLs. Local files and Matrix attachments do not require this."
     }
   }
 }

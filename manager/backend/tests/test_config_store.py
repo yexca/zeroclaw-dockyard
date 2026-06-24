@@ -559,12 +559,51 @@ class AgentRendererTest(unittest.TestCase):
         self.assertFalse((workspace.parent / "escape.md").exists())
 
     def test_export_agent_returns_env_compose_and_preview(self) -> None:
+        self.config["profiles"]["vision"] = [
+            {
+                "id": "vision-openai",
+                "provider_family": "openai",
+                "provider_alias": "vision",
+                "model": "gpt-4o-mini",
+                "base_url": "https://api.openai.com/v1",
+                "wire_api": "chat_completions",
+                "timeout_secs": 90,
+                "max_images": 3,
+                "max_image_size_mb": 6,
+                "max_image_turns": 1,
+            }
+        ]
+        self.agent["vision_profile"] = "vision-openai"
         exported = self.renderer.export_agent(self.config, self.agent)
 
         self.assertIn("env", exported["formats"])
         self.assertIn("compose", exported["formats"])
         self.assertIn("zeroclaw_config_preview", exported["formats"])
         self.assertIn("schema_version = 3", exported["formats"]["zeroclaw_config_preview"])
+        self.assertEqual(exported["formats"]["env"]["VISION_PROVIDER_FAMILY"], "openai")
+        self.assertEqual(exported["formats"]["env"]["VISION_PROVIDER_ALIAS"], "vision")
+        self.assertIn("[providers.models.openai.vision]", exported["formats"]["zeroclaw_config_preview"])
+        self.assertIn('vision_model_provider = "openai.vision"', exported["formats"]["zeroclaw_config_preview"])
+
+    def test_agent_without_vision_profile_disables_vision_route(self) -> None:
+        config = copy_config(self.config)
+        config["profiles"]["vision"] = [
+            {
+                "id": "vision-openai",
+                "provider_family": "openai",
+                "provider_alias": "vision",
+                "model": "gpt-4o-mini",
+                "base_url": "https://api.openai.com/v1",
+                "wire_api": "chat_completions",
+            }
+        ]
+        agent = copy_config(self.agent)
+        agent.pop("vision_profile", None)
+
+        exported = self.renderer.export_agent(config, agent)
+
+        self.assertEqual(exported["formats"]["env"]["VISION_ENABLED"], "false")
+        self.assertNotIn("vision_model_provider", exported["formats"]["zeroclaw_config_preview"])
 
     def test_export_agent_redacts_preview_when_requested(self) -> None:
         config = copy_config(self.config)
@@ -627,6 +666,37 @@ class ConfigValidatorTest(unittest.TestCase):
             self.validator.ensure_valid_for_start(config, config["agents"][0])
 
         self.assertEqual(context.exception.code, "validation_failed")
+
+    def test_validator_checks_vision_config(self) -> None:
+        config = {
+            "profiles": {
+                "llm": [],
+                "vision": [
+                    {
+                        "id": "bad-vision",
+                        "provider_family": "bad family",
+                        "provider_alias": "vision",
+                        "model": "",
+                        "base_url": "ftp://example.com",
+                        "wire_api": "",
+                        "max_images": 99,
+                    }
+                ],
+                "matrix": [],
+                "mcp": [],
+            },
+            "agents": [],
+        }
+
+        result = self.validator.validate_config(config)
+        codes = {entry["code"] for entry in result["errors"]}
+
+        self.assertFalse(result["valid"])
+        self.assertIn("invalid_vision_provider_family", codes)
+        self.assertIn("missing_vision_model", codes)
+        self.assertIn("invalid_vision_base_url", codes)
+        self.assertIn("missing_vision_wire_api", codes)
+        self.assertIn("invalid_vision_number", codes)
 
 
 def copy_config(config: dict) -> dict:

@@ -15,6 +15,7 @@ import yaml
 
 PROFILE_COLLECTIONS = {
     "llm": ("profiles", "llm"),
+    "vision": ("profiles", "vision"),
     "matrix": ("profiles", "matrix"),
     "mcp": ("profiles", "mcp"),
 }
@@ -68,6 +69,21 @@ def default_config() -> dict[str, Any]:
         },
         "profiles": {
             "llm": [],
+            "vision": [
+                {
+                    "id": "vision-default",
+                    "provider_family": "custom",
+                    "provider_alias": "vision",
+                    "model": "gpt-4o",
+                    "base_url": "https://api.openai.com/v1",
+                    "wire_api": "chat_completions",
+                    "timeout_secs": 120,
+                    "allow_remote_fetch": False,
+                    "max_images": 4,
+                    "max_image_size_mb": 5,
+                    "max_image_turns": 2,
+                }
+            ],
             "matrix": [],
             "mcp": [],
         },
@@ -290,8 +306,15 @@ class ConfigStore:
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         config = deep_merge(default_config(), raw)
         profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
+        vision_profiles = normalize_collection(profiles.get("vision"))
+        legacy_vision = config.get("vision") if isinstance(config.get("vision"), dict) else {}
+        if not vision_profiles and legacy_vision:
+            migrated = copy.deepcopy(legacy_vision)
+            migrated.setdefault("id", "vision-default")
+            vision_profiles = [migrated]
         config["profiles"] = {
             "llm": normalize_collection(profiles.get("llm")),
+            "vision": vision_profiles,
             "matrix": normalize_collection(profiles.get("matrix")),
             "mcp": normalize_collection(profiles.get("mcp")),
         }
