@@ -461,6 +461,12 @@ textarea {
   font-size: 13px;
 }
 
+.card-actions .icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
 .agent-detail-panel {
   border-top: 1px solid var(--color-border-soft);
   padding-top: 10px;
@@ -514,12 +520,34 @@ dd {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--color-control-border);
   border-radius: 6px;
   background: var(--color-control-bg);
   color: var(--color-text);
   padding: 8px 11px;
   font-weight: 700;
+  line-height: 1;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .button.primary {
@@ -860,11 +888,49 @@ dd {
   box-shadow: none;
 }
 
+.toast-region {
+  position: fixed;
+  z-index: 20;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 8px;
+  pointer-events: none;
+}
+
 .notice {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 10px 10px 12px;
+  box-shadow: var(--shadow-panel);
   font-weight: 700;
+  pointer-events: auto;
+}
+
+.notice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  padding: 0;
+}
+
+.toast-close:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .history-panel {
@@ -967,6 +1033,14 @@ dd {
   .compact-control,
   .inline-control {
     width: 100%;
+  }
+
+  .icon-button {
+    width: 36px;
+  }
+
+  .card-actions .icon-button {
+    width: 34px;
   }
 
   .form-grid,

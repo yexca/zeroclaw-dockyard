@@ -977,10 +977,53 @@ function selectField(labelKey, name, optionsHtml, attrs = "", helpKey = "") {
   return `<label class="field">${labelText(labelKey, attrs, helpKey)}<select name="${name}" ${attrs} ${help ? `title="${help}"` : ""}>${optionsHtml}</select></label>`;
 }
 
+const ACTION_ICONS = {
+  "actions.applyTemplate": "sparkles",
+  "actions.create": "plus",
+  "actions.delete": "trash",
+  "actions.downloadLogs": "download",
+  "actions.duplicate": "copy",
+  "actions.edit": "edit",
+  "actions.export": "download",
+  "actions.logs": "file-text",
+  "actions.refreshStatus": "refresh",
+  "actions.removeFile": "trash",
+  "actions.restart": "rotate",
+  "actions.save": "save",
+  "actions.start": "play",
+  "actions.stop": "square",
+  "actions.validate": "check"
+};
+
+const ICON_PATHS = {
+  check: '<path d="m5 12 4 4L19 6"></path>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path>',
+  edit: '<path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
+  "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path>',
+  play: '<path d="m6 3 14 9-14 9Z"></path>',
+  plus: '<path d="M12 5v14"></path><path d="M5 12h14"></path>',
+  refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"></path><path d="M3 21v-5h5"></path><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"></path><path d="M21 3v5h-5"></path>',
+  rotate: '<path d="M21 12a9 9 0 1 1-2.6-6.4"></path><path d="M21 3v6h-6"></path>',
+  save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path>',
+  sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"></path><path d="M5 3v4"></path><path d="M3 5h4"></path><path d="M19 17v4"></path><path d="M17 19h4"></path>',
+  square: '<rect x="6" y="6" width="12" height="12" rx="2"></rect>',
+  trash: '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+  x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>'
+};
+
 function actionButton(action, labelKey, variant = "secondary", disabled = false) {
-  return `<button type="button" class="button ${variant}" data-action="${escapeHtml(action)}" ${disabled ? "disabled" : ""}>${escapeHtml(
-    t(labelKey)
-  )}</button>`;
+  const label = t(labelKey);
+  const icon = ACTION_ICONS[labelKey];
+  const content = icon ? iconSvg(icon) : escapeHtml(label);
+  const modeClass = icon ? "icon-button" : "text-button";
+  return `<button type="button" class="button ${variant} ${modeClass}" data-action="${escapeHtml(action)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(
+    label
+  )}" ${disabled ? "disabled" : ""}>${content}</button>`;
+}
+
+function iconSvg(name) {
+  return `<svg class="icon" aria-hidden="true" viewBox="0 0 24 24">${ICON_PATHS[name] || ""}</svg>`;
 }
 
 function render() {
@@ -1002,12 +1045,20 @@ function render() {
 }
 
 function renderNotices() {
-  const loading = state.busy || (state.selectedTab === "dashboard" && state.dashboardLoading)
-    ? `<div class="notice muted">${escapeHtml(t("common.loading"))}</div>`
-    : "";
-  const notice = state.notice ? `<div class="notice success">${escapeHtml(state.notice)}</div>` : "";
-  const error = state.error ? `<div class="notice danger">${escapeHtml(state.error)}</div>` : "";
-  return `${loading}${notice}${error}`;
+  const loading = state.busy || (state.selectedTab === "dashboard" && state.dashboardLoading) ? renderNotice("muted", t("common.loading"), "status") : "";
+  const notice = state.notice ? renderNotice("success", state.notice, "status") : "";
+  const error = state.error ? renderNotice("danger", state.error, "alert") : "";
+  const notices = `${loading}${notice}${error}`;
+  return notices ? `<div class="toast-region" aria-live="polite">${notices}</div>` : "";
+}
+
+function renderNotice(kind, message, role) {
+  return `<div class="notice toast ${kind}" role="${role}">
+    <span>${escapeHtml(message)}</span>
+    <button type="button" class="toast-close" data-notice-dismiss title="${escapeHtml(t("actions.cancel"))}" aria-label="${escapeHtml(t("actions.cancel"))}">
+      ${iconSvg("x")}
+    </button>
+  </div>`;
 }
 
 function renderSelectedTab() {
@@ -1962,6 +2013,13 @@ async function deleteTemplate(id) {
 
 function bindEvents() {
   document.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-notice-dismiss]")) {
+      state.error = "";
+      state.notice = "";
+      render();
+      return;
+    }
+
     const tab = event.target.closest("[data-tab]")?.dataset.tab;
     if (tab) {
       state.selectedTab = tab;
