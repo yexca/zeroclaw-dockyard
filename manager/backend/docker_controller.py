@@ -27,7 +27,9 @@ MANAGER_LABEL = "zeroclaw.manager"
 AGENT_ID_LABEL = "zeroclaw.agent.id"
 AGENT_NAME_LABEL = "zeroclaw.agent.name"
 SPEC_HASH_LABEL = "zeroclaw.agent.spec_hash"
+ROLE_LABEL = "zeroclaw.role"
 DEFAULT_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian"
+DEFAULT_PROACTIVE_IMAGE = "python:3.12-alpine"
 CONTAINER_PORT = "42617/tcp"
 
 
@@ -151,6 +153,7 @@ class DockerApiController:
             actions.append("started")
             existing = self.inspect_container(existing["Id"])
 
+        actions.extend(self.reconcile_proactive_container(config, resolved, spec))
         return self.operation_result("start", spec, existing, actions)
 
     def stop(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
@@ -163,6 +166,13 @@ class DockerApiController:
             self.client.request("POST", f"/containers/{container['Id']}/stop", query={"t": 10})
             actions.append("stopped")
             container = self.inspect_container(container["Id"])
+        proactive_spec = self.build_proactive_spec(config, agent) or self.build_disabled_proactive_spec(config, agent)
+        proactive = self.find_container(proactive_spec)
+        if proactive and self.is_managed_container(proactive, proactive_spec):
+            proactive_state = proactive.get("State", {}) if isinstance(proactive, dict) else {}
+            if proactive_state.get("Running"):
+                self.client.request("POST", f"/containers/{proactive['Id']}/stop", query={"t": 10})
+                actions.append("proactive_stopped")
         return self.operation_result("stop", spec, container, actions or ["already_stopped"])
 
     def restart(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
@@ -199,6 +209,10 @@ class DockerApiController:
                 409,
             )
         self.remove_container(container["Id"], force=True)
+        proactive_spec = self.build_proactive_spec(config, agent) or self.build_disabled_proactive_spec(config, agent)
+        proactive = self.find_container(proactive_spec)
+        if proactive and self.is_managed_container(proactive, proactive_spec):
+            self.remove_container(proactive["Id"], force=True)
         return {
             "agent_id": spec.agent_id,
             "agent_name": spec.agent_name,
@@ -278,6 +292,39 @@ class DockerApiController:
             "lines": text.splitlines(),
         }
 
+    def reconcile_proactive_container(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec") -> list[str]:
+        proactive_spec = self.build_proactive_spec(config, agent, agent_spec=agent_spec)
+        existing = self.find_container(proactive_spec) if proactive_spec else None
+        if not proactive_spec:
+            disabled_spec = self.build_disabled_proactive_spec(config, agent, agent_spec=agent_spec)
+            disabled = self.find_container(disabled_spec)
+            if disabled and self.is_managed_container(disabled, disabled_spec):
+                self.remove_container(disabled["Id"], force=True)
+                return ["proactive_removed"]
+            return []
+        actions: list[str] = []
+        self.pull_image(proactive_spec.image)
+        if existing and not self.is_managed_container(existing, proactive_spec):
+            raise ConfigError(
+                "container_not_manager_owned",
+                "Refusing to modify a proactive container without the manager label.",
+                {"container": proactive_spec.container_name},
+                409,
+            )
+        if existing and self.needs_recreate(existing, proactive_spec):
+            self.remove_container(existing["Id"], force=True)
+            actions.append("proactive_recreated")
+            existing = None
+        if not existing:
+            created = self.create_proactive_container(proactive_spec)
+            existing = self.inspect_container(created["Id"])
+            actions.append("proactive_created")
+        state = existing.get("State", {}) if isinstance(existing, dict) else {}
+        if not state.get("Running"):
+            self.client.request("POST", f"/containers/{existing['Id']}/start")
+            actions.append("proactive_started")
+        return actions
+
     def build_container_spec(self, config: dict[str, Any], agent: dict[str, Any]) -> "ContainerSpec":
         resolved = self.renderer.resolve_agent(config, agent)
         agent_identifier = item_id(resolved)
@@ -307,6 +354,7 @@ class DockerApiController:
             MANAGER_LABEL: "true",
             AGENT_ID_LABEL: str(agent_identifier),
             AGENT_NAME_LABEL: agent_name,
+            ROLE_LABEL: "agent",
         }
         spec_payload = {
             "image": image,
@@ -337,6 +385,94 @@ class DockerApiController:
             labels=labels,
             extra_hosts=spec_payload["extra_hosts"],
             spec_hash=spec_hash,
+        )
+
+    def build_proactive_spec(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec" | None = None) -> "ContainerSpec | None":
+        resolved = self.renderer.resolve_agent(config, agent)
+        proactive = resolved.get("proactive") if isinstance(resolved.get("proactive"), dict) else {}
+        if not bool(proactive.get("enabled")):
+            return None
+        agent_spec = agent_spec or self.build_container_spec(config, resolved)
+        target = str(proactive.get("target") or first_item((resolved.get("matrix") or {}).get("external_peers")) or "").strip()
+        if not target:
+            raise ConfigError("missing_proactive_target", "Proactive target must be configured.", {"agent": agent_spec.agent_id}, 422)
+
+        docker_config = config.get("docker") if isinstance(config.get("docker"), dict) else {}
+        paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+        manager_mounts = self.manager_mount_sources()
+        project_name = str(docker_config.get("project_name") or "zeroclaw-matrix-multi")
+        network_name = str(docker_config.get("runtime_network") or f"{project_name}_default")
+        project_root = Path(str(paths.get("host_project_dir") or os.getenv("HOST_PROJECT_DIR") or self.project_root)).resolve()
+        bootstrap_dir = Path(str(paths.get("host_bootstrap_dir") or manager_mounts.get("/app/bootstrap") or project_root / "bootstrap")).resolve()
+        image = str(proactive.get("image") or DEFAULT_PROACTIVE_IMAGE)
+        gateway_host = str(proactive.get("gateway_host") or "host.docker.internal")
+        default_agent_url = f"http://{gateway_host}:{agent_spec.host_port}/webhook?{urlencode({'agent': agent_spec.agent_id})}"
+        agent_url = str(proactive.get("agent_url") or default_agent_url)
+        env = {
+            "PROACTIVE_ENABLED": "true",
+            "PROACTIVE_AGENT": agent_spec.agent_id,
+            "PROACTIVE_AGENT_URL": agent_url,
+            "PROACTIVE_CHANNEL": str(proactive.get("channel") or "matrix.home"),
+            "PROACTIVE_TARGET": target,
+            "PROACTIVE_PROMPT": str(proactive.get("prompt") or ""),
+            "PROACTIVE_POLL_SECONDS": str(proactive.get("poll_seconds") or 300),
+            "PROACTIVE_RANDOM_MIN_MINUTES": str(proactive.get("random_min_minutes") or 120),
+            "PROACTIVE_RANDOM_MAX_MINUTES": str(proactive.get("random_max_minutes") or 240),
+            "PROACTIVE_TIMEZONE": str(proactive.get("timezone") or "Asia/Tokyo"),
+            "PROACTIVE_QUIET_HOURS": str(proactive.get("quiet_hours") or "23-8"),
+            "PROACTIVE_STATE_DIR": "/state/proactive",
+        }
+        labels = {
+            MANAGER_LABEL: "true",
+            AGENT_ID_LABEL: agent_spec.agent_id,
+            AGENT_NAME_LABEL: agent_spec.agent_name,
+            ROLE_LABEL: "proactive",
+        }
+        spec_payload = {
+            "image": image,
+            "agent_id": agent_spec.agent_id,
+            "agent_name": agent_spec.agent_name,
+            "network_name": network_name,
+            "env": env,
+            "mounts": [
+                {"Type": "bind", "Source": str(bootstrap_dir), "Target": "/bootstrap", "ReadOnly": True},
+                {"Type": "bind", "Source": str(agent_spec.instance_dir), "Target": "/state"},
+            ],
+        }
+        spec_hash = stable_hash(spec_payload)
+        labels[SPEC_HASH_LABEL] = spec_hash
+        return ContainerSpec(
+            agent_id=agent_spec.agent_id,
+            agent_name=agent_spec.agent_name,
+            safe_name=agent_spec.safe_name,
+            container_name=f"zeroclaw-proactive-{agent_spec.safe_name}",
+            image=image,
+            host_port=0,
+            network_name=network_name,
+            bootstrap_dir=bootstrap_dir,
+            instance_dir=agent_spec.instance_dir,
+            environment=env,
+            labels=labels,
+            extra_hosts=["host.docker.internal:host-gateway"],
+            spec_hash=spec_hash,
+        )
+
+    def build_disabled_proactive_spec(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec" | None = None) -> "ContainerSpec":
+        agent_spec = agent_spec or self.build_container_spec(config, agent)
+        return ContainerSpec(
+            agent_id=agent_spec.agent_id,
+            agent_name=agent_spec.agent_name,
+            safe_name=agent_spec.safe_name,
+            container_name=f"zeroclaw-proactive-{agent_spec.safe_name}",
+            image=DEFAULT_PROACTIVE_IMAGE,
+            host_port=0,
+            network_name=agent_spec.network_name,
+            bootstrap_dir=agent_spec.bootstrap_dir,
+            instance_dir=agent_spec.instance_dir,
+            environment={},
+            labels={MANAGER_LABEL: "true", AGENT_ID_LABEL: agent_spec.agent_id, AGENT_NAME_LABEL: agent_spec.agent_name, ROLE_LABEL: "proactive"},
+            extra_hosts=["host.docker.internal:host-gateway"],
+            spec_hash="",
         )
 
     def configure_client(self, config: dict[str, Any]) -> None:
@@ -389,6 +525,30 @@ class DockerApiController:
                 "PortBindings": {
                     CONTAINER_PORT: [{"HostIp": "127.0.0.1", "HostPort": str(spec.host_port)}],
                 },
+                "ExtraHosts": spec.extra_hosts,
+            },
+            "NetworkingConfig": {
+                "EndpointsConfig": {
+                    spec.network_name: {},
+                },
+            },
+        }
+        return self.client.request("POST", "/containers/create", payload=payload, query={"name": spec.container_name})
+
+    def create_proactive_container(self, spec: "ContainerSpec") -> dict[str, Any]:
+        (spec.instance_dir / "proactive").mkdir(parents=True, exist_ok=True)
+        payload = {
+            "Image": spec.image,
+            "WorkingDir": "/state",
+            "Entrypoint": ["python", "/bootstrap/proactive.py"],
+            "Env": [f"{key}={value}" for key, value in sorted(spec.environment.items())],
+            "Labels": spec.labels,
+            "HostConfig": {
+                "RestartPolicy": {"Name": "unless-stopped"},
+                "Mounts": [
+                    {"Type": "bind", "Source": str(spec.bootstrap_dir), "Target": "/bootstrap", "ReadOnly": True},
+                    {"Type": "bind", "Source": str(spec.instance_dir), "Target": "/state"},
+                ],
                 "ExtraHosts": spec.extra_hosts,
             },
             "NetworkingConfig": {
@@ -608,6 +768,14 @@ def build_controller_from_env(project_root: Path) -> DockerController:
 def safe_container_part(value: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "-", value.strip()).strip("-._")
     return safe.lower() or "agent"
+
+
+def first_item(value: Any) -> str:
+    if isinstance(value, list) and value:
+        return str(value[0])
+    if isinstance(value, str):
+        return value.split(",", 1)[0].strip()
+    return ""
 
 
 def stable_hash(value: Any) -> str:

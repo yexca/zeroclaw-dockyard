@@ -5,6 +5,20 @@ import { createThemeController } from "./theme.mjs";
 const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md"];
 const PROJECT_OPTIONAL_FILES = ["PROACTIVE.md"];
 const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", ...PROJECT_OPTIONAL_FILES];
+const DEFAULT_ZEROCLAW_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian";
+const DEFAULT_AGENT_HOST_PORT = 42641;
+const DEFAULT_PROACTIVE_PROMPT =
+  'You are being invoked by the proactive sidecar, not by the user. Review PROACTIVE.md, memory, and current context. If there is a concrete, timely reason to contact the user, send one short Matrix message with send_message_to_peer using the configured channel and peer target. If there is no useful reason, respond exactly with "skip".';
+const DEFAULT_PROACTIVE = {
+  enabled: true,
+  random_min_minutes: 120,
+  random_max_minutes: 240,
+  poll_seconds: 300,
+  quiet_hours: "23-8",
+  timezone: "Asia/Tokyo",
+  channel: "matrix.home",
+  prompt: DEFAULT_PROACTIVE_PROMPT
+};
 const DEFAULT_TEMPLATE_FILES = {
   "AGENTS.md": `# AGENTS.md — {agent} Personal Assistant
 
@@ -525,8 +539,12 @@ function fieldDisplayName(name) {
     id: t("fields.id"),
     name: t("fields.name"),
     host_port: t("fields.hostPort"),
+    matrix_external_peers: t("fields.externalPeers"),
     llm_profile: t("fields.llmProfile"),
     matrix_profile: t("fields.matrixProfile"),
+    proactive_random_min_minutes: t("fields.proactiveRandomMinMinutes"),
+    proactive_random_max_minutes: t("fields.proactiveRandomMaxMinutes"),
+    proactive_poll_seconds: t("fields.proactivePollSeconds"),
     provider_family: t("fields.provider"),
     provider_alias: t("fields.providerAlias"),
     base_url: t("fields.baseUrl"),
@@ -589,6 +607,14 @@ function requireNumber(data, key, options = {}) {
     throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName(key)), key);
   }
   return value;
+}
+
+function requireLines(data, key) {
+  const values = fromLines(String(data.get(key) || ""));
+  if (!values.length) {
+    throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName(key)), key);
+  }
+  return values;
 }
 
 function validateUrlLike(value, key, { required = false } = {}) {
@@ -832,6 +858,25 @@ function defaultTemplateFiles() {
   return cloneData(DEFAULT_TEMPLATE_FILES);
 }
 
+function nextAgentHostPort() {
+  const used = new Set(collection("agents").map((agent) => Number(agent.host_port)).filter((port) => Number.isInteger(port)));
+  let port = DEFAULT_AGENT_HOST_PORT;
+  while (used.has(port) && port < 65535) port += 1;
+  return port;
+}
+
+function defaultAgent(id) {
+  return {
+    id,
+    enabled: true,
+    host_port: nextAgentHostPort(),
+    image: DEFAULT_ZEROCLAW_IMAGE,
+    matrix: {},
+    proactive: cloneData(DEFAULT_PROACTIVE),
+    _draft: true
+  };
+}
+
 function normalizeTemplateFilename(value) {
   const filename = String(value || "").trim();
   if (
@@ -978,7 +1023,7 @@ function renderSelectedTab() {
 }
 
 function renderDashboard() {
-  const agents = collection("agents");
+  const rows = state.dashboard?.agents || [];
   return `
     <header class="section-header">
       <div><h2>${escapeHtml(t("dashboard.title"))}</h2><p>${escapeHtml(t("dashboard.subtitle"))}</p></div>
@@ -994,8 +1039,8 @@ function renderDashboard() {
     </header>
     <div class="agent-grid">
       ${
-        agents.length
-          ? agents.map(renderAgentCard).join("")
+        rows.length
+          ? rows.map((row) => renderAgentCard(row.agent)).join("")
           : `<div class="empty-state">${escapeHtml(t("dashboard.empty"))}</div>`
       }
     </div>
@@ -1112,8 +1157,8 @@ function renderItemList(kind, items, selectedId) {
 
 function renderAgentForm(agent) {
   return `
-    ${renderAgentRequiredFields(agent)}
-    ${renderAgentBasicFields(agent)}
+    ${renderAgentPrimaryFields(agent)}
+    ${renderAgentProactiveFields(agent)}
     ${renderAgentAdvancedFields(agent)}
     <div class="button-row form-actions">
       ${actionButton("agent-save", "actions.save", "primary")}
@@ -1124,12 +1169,13 @@ function renderAgentForm(agent) {
   `;
 }
 
-function renderAgentRequiredFields(agent) {
+function renderAgentPrimaryFields(agent) {
+  const hostPort = agent.host_port || DEFAULT_AGENT_HOST_PORT;
+  const matrix = agent.matrix || {};
   return `<section class="form-section">
-    <h3>${escapeHtml(t("fields.requiredSettings"))}</h3>
     <div class="form-grid">
       ${field("fields.id", "id", itemId(agent), "required", "fieldHelp.agent.id")}
-      ${field("fields.hostPort", "host_port", agent.host_port || "", 'type="number" min="1" max="65535" required', "fieldHelp.agent.hostPort")}
+      ${field("fields.hostPort", "host_port", hostPort, 'type="number" min="1" max="65535" required', "fieldHelp.agent.hostPort")}
       ${selectField("fields.llmProfile", "llm_profile", optionList(collection("llm"), agent.llm_profile, "common.none"), "required", "fieldHelp.agent.llmProfile")}
       ${selectField(
         "fields.matrixProfile",
@@ -1138,17 +1184,6 @@ function renderAgentRequiredFields(agent) {
         "required",
         "fieldHelp.agent.matrixProfile"
       )}
-    </div>
-  </section>`;
-}
-
-function renderAgentBasicFields(agent) {
-  const matrix = agent.matrix || {};
-  return `<details class="form-section" open>
-    <summary>${escapeHtml(t("fields.basicSettings"))}</summary>
-    <div class="form-grid">
-      ${field("fields.name", "name", agent.name || "", "", "fieldHelp.agent.name")}
-      ${field("fields.image", "image", agent.image || "", "", "fieldHelp.agent.image")}
       ${selectField(
         "fields.promptTemplate",
         "prompt_template",
@@ -1157,15 +1192,16 @@ function renderAgentBasicFields(agent) {
         "fieldHelp.agent.promptTemplate"
       )}
       ${selectField("fields.mcpProfile", "mcp_profile", optionList(collection("mcp"), agent.mcp_profile, "common.none"), "", "fieldHelp.agent.mcpProfile")}
-      ${textareaField("fields.externalPeers", "matrix_external_peers", asLines(matrix.external_peers), "", "fieldHelp.agent.externalPeers")}
+      ${textareaField("fields.externalPeers", "matrix_external_peers", asLines(matrix.external_peers), "required", "fieldHelp.agent.externalPeers")}
     </div>
-  </details>`;
+  </section>`;
 }
 
 function renderAgentAdvancedFields(agent) {
   return `<details class="form-section">
     <summary>${escapeHtml(t("fields.advanced"))}</summary>
     <div class="form-grid">
+      ${field("fields.dockerImage", "image", agent.image || DEFAULT_ZEROCLAW_IMAGE, "", "fieldHelp.agent.image")}
       ${selectField(
         "fields.templateApplyMode",
         "template_apply_mode",
@@ -1180,8 +1216,26 @@ function renderAgentAdvancedFields(agent) {
         "",
         "fieldHelp.agent.templateApplyMode"
       )}
-      ${checkboxField("fields.allowEmptyExternalPeers", "allow_empty_external_peers", agent.allow_empty_external_peers === true, "fieldHelp.agent.allowEmptyExternalPeers")}
       ${textareaField("fields.environment", "environment", JSON.stringify(agent.environment || {}, null, 2), "", "fieldHelp.agent.environment")}
+    </div>
+  </details>`;
+}
+
+function renderAgentProactiveFields(agent) {
+  const proactive = { ...DEFAULT_PROACTIVE, ...(agent.proactive || {}) };
+  return `<details class="form-section" ${proactive.enabled === true ? "open" : ""}>
+    <summary>${escapeHtml(t("fields.proactiveSettings"))}</summary>
+    <div class="form-grid">
+      ${checkboxField("fields.proactiveEnabled", "proactive_enabled", proactive.enabled === true, "fieldHelp.agent.proactiveEnabled")}
+      ${field("fields.proactiveTarget", "proactive_target", proactive.target || "", "", "fieldHelp.agent.proactiveTarget")}
+      ${field("fields.proactiveRandomMinMinutes", "proactive_random_min_minutes", proactive.random_min_minutes ?? "", 'type="number" min="1"', "fieldHelp.agent.proactiveRandomMinMinutes")}
+      ${field("fields.proactiveRandomMaxMinutes", "proactive_random_max_minutes", proactive.random_max_minutes ?? "", 'type="number" min="1"', "fieldHelp.agent.proactiveRandomMaxMinutes")}
+      ${field("fields.proactivePollSeconds", "proactive_poll_seconds", proactive.poll_seconds ?? "", 'type="number" min="30"', "fieldHelp.agent.proactivePollSeconds")}
+      ${field("fields.proactiveQuietHours", "proactive_quiet_hours", proactive.quiet_hours || "", "", "fieldHelp.agent.proactiveQuietHours")}
+      ${field("fields.proactiveTimezone", "proactive_timezone", proactive.timezone || "", "", "fieldHelp.agent.proactiveTimezone")}
+      ${field("fields.proactiveChannel", "proactive_channel", proactive.channel || "", "", "fieldHelp.agent.proactiveChannel")}
+      ${field("fields.proactiveAgentUrl", "proactive_agent_url", proactive.agent_url || "", 'type="url"', "fieldHelp.agent.proactiveAgentUrl")}
+      ${textareaField("fields.proactivePrompt", "proactive_prompt", proactive.prompt || "", "", "fieldHelp.agent.proactivePrompt")}
     </div>
   </details>`;
 }
@@ -1471,7 +1525,6 @@ function agentFromForm(form) {
   return cleanEmptyValues({
     ...current,
     id: requireString(data, "id"),
-    name: String(data.get("name") || "").trim(),
     enabled: true,
     host_port: requireNumber(data, "host_port", { min: 1, max: 65535 }),
     image: String(data.get("image") || "").trim(),
@@ -1480,10 +1533,22 @@ function agentFromForm(form) {
     mcp_profile: String(data.get("mcp_profile") || ""),
     prompt_template: String(data.get("prompt_template") || ""),
     template_apply_mode: String(data.get("template_apply_mode") || "keep"),
-    allow_empty_external_peers: data.get("allow_empty_external_peers") === "on",
+    proactive: {
+      ...(current.proactive || {}),
+      enabled: data.get("proactive_enabled") === "on",
+      target: String(data.get("proactive_target") || "").trim(),
+      random_min_minutes: parseOptionalNumber(data.get("proactive_random_min_minutes"), fieldDisplayName("proactive_random_min_minutes"), { min: 1 }),
+      random_max_minutes: parseOptionalNumber(data.get("proactive_random_max_minutes"), fieldDisplayName("proactive_random_max_minutes"), { min: 1 }),
+      poll_seconds: parseOptionalNumber(data.get("proactive_poll_seconds"), fieldDisplayName("proactive_poll_seconds"), { min: 30 }),
+      quiet_hours: String(data.get("proactive_quiet_hours") || "").trim(),
+      timezone: String(data.get("proactive_timezone") || "").trim(),
+      channel: String(data.get("proactive_channel") || "").trim(),
+      agent_url: String(data.get("proactive_agent_url") || "").trim(),
+      prompt: String(data.get("proactive_prompt") || "").trim()
+    },
     matrix: {
       ...matrix,
-      external_peers: fromLines(String(data.get("matrix_external_peers") || ""))
+      external_peers: requireLines(data, "matrix_external_peers")
     },
     environment: readJsonField(data, "environment", {})
   });
@@ -1647,7 +1712,7 @@ async function handleAction(action) {
   }
   if (action === "agent-new") {
     state.selectedAgentId = "";
-    state.config.agents.unshift({ id: nextId("agent", collection("agents")), enabled: true, matrix: {}, _draft: true });
+    state.config.agents.unshift(defaultAgent(nextId("agent", collection("agents"))));
     state.selectedAgentId = itemId(state.config.agents[0]);
     render();
   }
@@ -1656,6 +1721,9 @@ async function handleAction(action) {
     if (!source) return;
     const copy = cloneData(source);
     copy.id = nextId(`${itemId(source)}-copy`, collection("agents"));
+    delete copy.name;
+    if (!copy.image) copy.image = DEFAULT_ZEROCLAW_IMAGE;
+    copy.proactive = { ...cloneData(DEFAULT_PROACTIVE), ...(copy.proactive || {}) };
     copy._draft = true;
     state.config.agents.unshift(copy);
     state.selectedAgentId = copy.id;
@@ -1684,14 +1752,27 @@ async function handleAction(action) {
     const agent = selectedAgent();
     if (!agent) return;
     const form = document.querySelector('[data-form="agent"]');
-    const mode = String(new FormData(form).get("template_apply_mode") || "keep");
+    let item;
+    try {
+      item = agentFromForm(form);
+    } catch (error) {
+      if (error instanceof FormValidationError) return alertValidation(error);
+      throw error;
+    }
+    const data = new FormData(form);
+    const mode = String(data.get("template_apply_mode") || "keep");
     if (mode === "overwrite" && !(await confirmDanger("confirm.overwriteWorkspace"))) return;
     return runAction(
-      async () =>
-        api(`/api/agents/${encodeURIComponent(itemId(agent))}/apply-template`, {
+      async () => {
+        await saveItem("agents", state.selectedAgentId, item);
+        state.selectedAgentId = itemId(item);
+        const result = await api(`/api/agents/${encodeURIComponent(itemId(item))}/apply-template`, {
           method: "POST",
           body: JSON.stringify({ mode })
-        }),
+        });
+        state.dashboardRequested = false;
+        return result;
+      },
       "messages.templateApplied"
     );
   }

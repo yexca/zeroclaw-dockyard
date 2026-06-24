@@ -6,6 +6,7 @@ import re
 import socket
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 try:
     from agent_renderer import DEFAULT_ZEROCLAW_IMAGE, AgentRenderer, safe_name_part
@@ -87,11 +88,15 @@ class ConfigValidator:
             errors.append(issue("missing_matrix_user_id", f"{prefix}.matrix.user_id", "Matrix user id must be non-empty."))
         if not string_value(env.get("ZEROCLAW_channels__matrix__home__access_token")) and not string_value(env.get("ZEROCLAW_channels__matrix__home__password")):
             errors.append(issue("missing_matrix_credentials", f"{prefix}.matrix", "Matrix access token or password must be configured."))
-        if not string_value(env.get("MATRIX_EXTERNAL_PEERS")) and not bool(agent.get("allow_empty_external_peers")):
-            errors.append(issue("missing_matrix_external_peers", f"{prefix}.matrix.external_peers", "Matrix external peers must be non-empty unless allow_empty_external_peers is true."))
+        if not string_value(env.get("MATRIX_EXTERNAL_PEERS")):
+            errors.append(issue("missing_matrix_external_peers", f"{prefix}.matrix.external_peers", "Matrix external peers must be non-empty."))
 
         if env.get("MCP_ENABLED", "").lower() == "true" and not string_value(env.get("MCP_URL")):
             errors.append(issue("missing_mcp_url", f"{prefix}.mcp.url", "MCP URL must be non-empty when MCP is enabled."))
+
+        proactive = resolved.get("proactive") if isinstance(resolved.get("proactive"), dict) else {}
+        if bool(proactive.get("enabled")):
+            self._validate_proactive(prefix, proactive, env, errors)
 
         template_id = resolved.get("prompt_template")
         try:
@@ -104,6 +109,29 @@ class ConfigValidator:
             errors.append(issue("workspace_not_writable", f"{prefix}.workspace", "Workspace directory is not writable.", {"path": str(workspace)}))
 
         return {"valid": not errors, "errors": errors, "warnings": warnings}
+
+    def _validate_proactive(self, prefix: str, proactive: dict[str, Any], env: dict[str, str], errors: list[dict[str, Any]]) -> None:
+        target = proactive.get("target")
+        if not string_value(target) and not string_value(env.get("MATRIX_EXTERNAL_PEERS")):
+            errors.append(issue("missing_proactive_target", f"{prefix}.proactive.target", "Proactive target must be set or Matrix external peers must contain at least one target."))
+        for key, minimum in {
+            "poll_seconds": 30,
+            "random_min_minutes": 1,
+            "random_max_minutes": 1,
+        }.items():
+            value = proactive.get(key)
+            if value is not None and (not isinstance(value, int) or value < minimum):
+                errors.append(issue("invalid_proactive_number", f"{prefix}.proactive.{key}", f"Proactive {key} must be an integer greater than or equal to {minimum}.", {"value": value}))
+        min_minutes = proactive.get("random_min_minutes")
+        max_minutes = proactive.get("random_max_minutes")
+        if isinstance(min_minutes, int) and isinstance(max_minutes, int) and max_minutes < min_minutes:
+            errors.append(issue("invalid_proactive_range", f"{prefix}.proactive.random_max_minutes", "Proactive random max minutes must be greater than or equal to random min minutes."))
+        quiet_hours = proactive.get("quiet_hours")
+        if string_value(quiet_hours) and not re.match(r"^(?:[01]?\d|2[0-3])-(?:[01]?\d|2[0-3])$", str(quiet_hours).strip()):
+            errors.append(issue("invalid_proactive_quiet_hours", f"{prefix}.proactive.quiet_hours", "Proactive quiet hours must look like 23-8."))
+        agent_url = proactive.get("agent_url")
+        if string_value(agent_url) and not is_http_url(str(agent_url)):
+            errors.append(issue("invalid_proactive_agent_url", f"{prefix}.proactive.agent_url", "Proactive gateway URL override must be a valid http/https URL."))
 
     def ensure_valid_for_start(self, config: dict[str, Any], agent: dict[str, Any]) -> None:
         result = self.validate_agent(config, agent, check_ports=False)
@@ -151,6 +179,11 @@ def issue(code: str, field: str, message: str, details: dict[str, Any] | None = 
 
 def string_value(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def is_http_url(value: str) -> bool:
+    parsed = urlparse(value.strip())
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 def is_port_in_use(port: int) -> bool:

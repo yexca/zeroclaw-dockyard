@@ -97,14 +97,31 @@ field name.
 
 The Agents view now focuses on container/runtime wiring and per-agent peer
 membership. Required fields include the agent ID, host port, LLM profile, and
-Matrix profile. Matrix identity and credential fields such as `user_id`,
-`device_id`, `password`, `access_token`, and `recovery_key` are edited in the
-Matrix Profiles view.
+Matrix profile. The WebUI uses Agent ID as the visible identity; legacy `name`
+values are still understood by the backend for older configs. Matrix identity
+and credential fields such as `user_id`, `device_id`, `password`,
+`access_token`, and `recovery_key` are edited in the Matrix Profiles view.
 
 Agent-level Matrix settings should normally be limited to `external_peers`,
-which controls the generated Matrix peer group for that one agent. Advanced
-agent settings include prompt template apply mode, the local-testing
-`allow_empty_external_peers` bypass, and explicit environment overrides.
+which controls the generated Matrix peer group for that one agent. This field
+is required because ZeroClaw uses it to authorize inbound Matrix peers and
+`send_message_to_peer` outbound targets. Advanced agent settings include Docker
+image, prompt template apply mode, and explicit environment overrides.
+
+Saving an agent stores its manager configuration. Applying its prompt template
+initializes the agent workspace by writing the selected prompt files. The
+Dashboard only lists agents whose workspace has been initialized, so draft
+configurations do not appear as runnable agents until `Apply template` has
+created their workspace files.
+
+The Proactive sidecar section can create one companion container per agent.
+The sidecar reads the agent's configured `host_port` and calls that agent's
+gateway automatically through `/webhook?agent=<id>`. Operators normally do not
+enter a port in the proactive form; the advanced Gateway URL override exists for
+custom gateways or experiments. If no explicit target is configured, the
+sidecar uses the first External peers entry. The default wake prompt asks the
+agent to review `PROACTIVE.md`, memory, and current context before deciding
+whether to send one short Matrix message or return `skip`.
 
 ## Matrix Profiles
 

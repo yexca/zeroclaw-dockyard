@@ -318,7 +318,11 @@ class ManagerHandler(BaseHTTPRequestHandler):
         config = STORE.load()
         agents = STORE.list_agents()
         rows = []
+        skipped_uninitialized = 0
         for agent in agents:
+            if not STORE.agent_workspace_initialized(config, agent):
+                skipped_uninitialized += 1
+                continue
             identifier = agent_identifier(agent)
             try:
                 status = DOCKER.status(config, agent)
@@ -339,6 +343,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
         return {
             "checked_at": utc_now(),
             "agents": rows,
+            "skipped_uninitialized_agents": skipped_uninitialized,
             "history": HISTORY.list(limit=25),
         }
 

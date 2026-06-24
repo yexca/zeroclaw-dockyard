@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import tempfile
 import unittest
@@ -132,8 +132,8 @@ class ConfigStoreTest(unittest.TestCase):
                         "llm_profile": "llm",
                         "matrix_profile": "matrix",
                         "prompt_template": "default",
-                        "allow_empty_external_peers": True,
-                        "matrix": {"user_id": "@agent1:matrix.example.com"},
+
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
             }
@@ -148,6 +148,35 @@ class ConfigStoreTest(unittest.TestCase):
             (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
             "hello",
         )
+
+    def test_agent_workspace_initialized_requires_written_files(self) -> None:
+        self.store.update_full_config(
+            {
+                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    }
+                ],
+            }
+        )
+        config = self.store.load()
+        agent = self.store.get_agent("agent1")
+
+        self.assertFalse(self.store.agent_workspace_initialized(config, agent))
+        self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
+        self.assertTrue(self.store.agent_workspace_initialized(config, agent))
 
     def test_update_full_config_rejects_validation_errors(self) -> None:
         with self.assertRaises(ConfigError) as context:
@@ -185,8 +214,8 @@ class ConfigStoreTest(unittest.TestCase):
                         "host_port": 42641,
                         "llm_profile": "llm",
                         "matrix_profile": "matrix",
-                        "allow_empty_external_peers": True,
-                        "matrix": {"user_id": "@agent1:matrix.example.com"},
+
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
             }
@@ -212,8 +241,8 @@ class ConfigStoreTest(unittest.TestCase):
                         "host_port": 42641,
                         "llm_profile": "remote",
                         "matrix_profile": "matrix",
-                        "allow_empty_external_peers": True,
-                        "matrix": {"user_id": "@agent1:matrix.example.com"},
+
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
             }
@@ -299,6 +328,49 @@ class DockerControllerTest(unittest.TestCase):
 
         self.assertEqual(spec.instance_dir, Path(self.temp_dir.name) / "host-instances" / "agent1")
         self.assertEqual(spec.bootstrap_dir, Path(self.temp_dir.name) / "host-bootstrap")
+
+    def test_build_proactive_spec_uses_agent_host_port(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+        controller._manager_mounts = {
+            "/app/instances": str(Path(self.temp_dir.name) / "host-instances"),
+            "/app/bootstrap": str(Path(self.temp_dir.name) / "host-bootstrap"),
+        }
+        agent = {
+            "id": "agent1",
+            "name": "agent1",
+            "host_port": 42641,
+            "matrix": {"external_peers": ["@you:matrix.example.com"]},
+            "proactive": {"enabled": True, "random_min_minutes": 10, "random_max_minutes": 20},
+        }
+
+        spec = controller.build_proactive_spec({}, agent)
+
+        self.assertIsNotNone(spec)
+        assert spec is not None
+        self.assertEqual(spec.container_name, "zeroclaw-proactive-agent1")
+        self.assertEqual(spec.environment["PROACTIVE_AGENT_URL"], "http://host.docker.internal:42641/webhook?agent=agent1")
+        self.assertEqual(spec.environment["PROACTIVE_TARGET"], "@you:matrix.example.com")
+        self.assertEqual(spec.instance_dir, Path(self.temp_dir.name) / "host-instances" / "agent1")
+
+    def test_build_proactive_spec_allows_gateway_url_override(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+        controller._manager_mounts = {
+            "/app/instances": str(Path(self.temp_dir.name) / "host-instances"),
+            "/app/bootstrap": str(Path(self.temp_dir.name) / "host-bootstrap"),
+        }
+        agent = {
+            "id": "agent1",
+            "name": "agent1",
+            "host_port": 42641,
+            "matrix": {"external_peers": ["@you:matrix.example.com"]},
+            "proactive": {"enabled": True, "agent_url": "http://gateway.local/custom"},
+        }
+
+        spec = controller.build_proactive_spec({}, agent)
+
+        self.assertIsNotNone(spec)
+        assert spec is not None
+        self.assertEqual(spec.environment["PROACTIVE_AGENT_URL"], "http://gateway.local/custom")
 
     def test_decode_docker_multiplexed_logs(self) -> None:
         frame = b"\x01\x00\x00\x00" + (6).to_bytes(4, "big") + b"hello\n"

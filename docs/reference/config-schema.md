@@ -27,17 +27,36 @@ Primary config is YAML. The manager reads `config/manager.yaml` locally, or
 
 Common agent fields:
 
-- `id` or `name`: unique identifier.
+- `id`: unique identifier used by the WebUI. `name` is still accepted for
+  legacy configs, but new WebUI edits use `id` as the visible identity.
 - `enabled`: UI/runtime intent.
 - `host_port`: loopback gateway port.
-- `image`: optional image override.
+- `image`: Docker image for this agent. The WebUI fills the current default
+  ZeroClaw image.
 - `llm_profile`, `matrix_profile`, `mcp_profile`: profile references.
 - `prompt_template`: workspace template reference.
-- `matrix.external_peers`: per-agent peer group members. Matrix identity,
-  credentials, rooms, and channel behavior should live in the selected Matrix
-  profile.
+- `matrix.external_peers`: required per-agent peer group members. Matrix
+  identity, credentials, rooms, and channel behavior should live in the
+  selected Matrix profile.
+- `proactive`: optional per-agent proactive sidecar settings.
 - `environment`: explicit environment overrides for advanced use.
-- `allow_empty_external_peers`: bypasses peer validation for local testing.
+
+`agents[].proactive` fields:
+
+- `enabled`: create a per-agent proactive sidecar container.
+- `target`: Matrix peer target used by `send_message_to_peer`. If empty, the
+  first `matrix.external_peers` entry is used.
+- `channel`: Matrix channel alias passed to `send_message_to_peer`. Default:
+  `matrix.home`.
+- `agent_url`: advanced full gateway URL override. Empty uses the agent's
+  `host_port` automatically as `http://host.docker.internal:<port>/webhook?agent=<id>`.
+- `random_min_minutes`, `random_max_minutes`: randomized wake interval range.
+- `poll_seconds`: sidecar polling interval. Minimum recommended value: `30`.
+- `quiet_hours`: local quiet-hour range such as `23-8`; empty disables quiet
+  hours.
+- `timezone`: timezone used for quiet hours.
+- `prompt`: optional wake prompt override. Empty uses the built-in prompt that
+  asks the agent to review `PROACTIVE.md`, memory, and current context.
 
 ## Prompt Template Fields
 

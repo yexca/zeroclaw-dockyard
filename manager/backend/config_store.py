@@ -271,6 +271,15 @@ class ConfigStore:
         agent = self.get_agent(identifier)
         return self.renderer.initialize_workspace(config, agent, mode=mode)
 
+    def agent_workspace_initialized(self, config: dict[str, Any], agent: dict[str, Any]) -> bool:
+        workspace = self.renderer.workspace_dir(config, agent)
+        if not workspace.is_dir():
+            return False
+        try:
+            return any(workspace.iterdir())
+        except OSError:
+            return False
+
     def render_agent(self, identifier: str, formats: list[str] | None = None) -> dict[str, Any]:
         config = self.load()
         agent = self.get_agent(identifier)

@@ -127,22 +127,34 @@ prompt_templates:
       HEARTBEAT.md: ""
 
 agents:
-  - name: agent1
+  - id: agent1
     enabled: true
     host_port: 42641
+    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: deepseek-text
     matrix_profile: matrix-default
     mcp_profile: mcp-home
     prompt_template: default
+    proactive:
+      enabled: true
+      random_min_minutes: 120
+      random_max_minutes: 240
+      poll_seconds: 300
+      quiet_hours: "23-8"
+      timezone: Asia/Tokyo
+      channel: matrix.home
+      target: ""
+      prompt: 'You are being invoked by the proactive sidecar, not by the user. Review PROACTIVE.md, memory, and current context. If there is a concrete, timely reason to contact the user, send one short Matrix message with send_message_to_peer using the configured channel and peer target. If there is no useful reason, respond exactly with "skip".'
     matrix:
       user_id: "@agent1:matrix.example.com"
       device_id: ZEROCLAW_AGENT1
       external_peers:
         - "@you:matrix.example.com"
         - "#agent1-room:matrix.example.com"
-  - name: agent2
+  - id: agent2
     enabled: true
     host_port: 42642
+    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: ollama-local
     matrix_profile: matrix-default
     mcp_profile: mcp-home
@@ -153,9 +165,10 @@ agents:
       external_peers:
         - "@you:matrix.example.com"
         - "#agent2-room:matrix.example.com"
-  - name: agent3
+  - id: agent3
     enabled: true
     host_port: 42643
+    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
     llm_profile: gemini-flash
     matrix_profile: matrix-default
     mcp_profile: mcp-home
