@@ -28,7 +28,8 @@
     "mcp": "MCP 配置",
     "prompts": "提示词模板",
     "export": "导出",
-    "vision": "Vision LLM 配置"
+    "vision": "Vision LLM 配置",
+    "resources": "Docker 资源"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -359,5 +360,32 @@
     "title": "Vision LLM 配置",
     "subtitle": "用于图片附件和多模态回合的可复用视觉模型配置。",
     "empty": "创建或选择一个 Vision LLM 配置。"
+  },
+  "resources": {
+    "title": "Docker 资源",
+    "subtitle": "查看当前配置期望的资源，以及可能遗留、脱管或命名冲突的容器、卷和网络。",
+    "containers": "容器",
+    "volumes": "卷",
+    "networks": "网络",
+    "expected": "配置中的资源",
+    "orphans": "不在配置中",
+    "legacy": "未跟踪的 ZeroClaw 命名资源",
+    "untracked": "未跟踪的 ZeroClaw 命名资源",
+    "conflicts": "需要确认",
+    "count": "{count} 个资源",
+    "emptyBucket": "这一组暂时没有资源。",
+    "summary": "{expected} 配置中 / {orphans} 不在配置中 / {legacy} 未跟踪 / {conflicts} 需确认",
+    "expectedErrors": "部分 agent 无法推导对应的 Docker 资源。",
+    "kind": "类型",
+    "role": "角色",
+    "agent": "Agent",
+    "state": "状态",
+    "labels": "标签",
+    "aboutTitle": "这些分组是什么意思",
+    "aboutSummary": "展开查看具体判断规则。",
+    "expectedHelp": "当前管理器配置会推导出这个资源名，并且 Docker 标签也表明它属于管理器。",
+    "conflictsHelp": "当前配置会推导出这个资源名，但资源缺少管理器归属标签。这通常是旧版本创建的资源，修改前需要确认。",
+    "orphansHelp": "Docker 标签表明它属于管理器，但当前配置已经不再需要这个资源。",
+    "untrackedHelp": "资源名包含 zeroclaw，但当前配置不需要它，也没有管理器归属标签。它可能属于另一套本地配置。"
   }
 }

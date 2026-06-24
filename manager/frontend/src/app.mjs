@@ -297,7 +297,7 @@ Update this file as you evolve. Your identity is yours to shape.
 (Track unfinished tasks and follow-ups here)
 `
 };
-const TABS = ["dashboard", "agents", "llm", "vision", "matrix", "mcp", "prompts", "export"];
+const TABS = ["dashboard", "agents", "llm", "vision", "matrix", "mcp", "prompts", "export", "resources"];
 const DEFAULT_TAB = "agents";
 const SECRET_KEYS = ["api_key", "token", "password", "recovery_key", "secret"];
 const LLM_PRESETS = {
@@ -390,6 +390,9 @@ const state = {
   pendingTemplateFileName: "",
   dashboard: null,
   dashboardRequested: false,
+  dockerResources: null,
+  dockerResourcesRequested: false,
+  dockerResourcesLoading: false,
   agentStatuses: {},
   agentLogs: {},
   logTail: 200,
@@ -781,6 +784,10 @@ async function refreshDashboard() {
   }
 }
 
+async function refreshDockerResources() {
+  state.dockerResources = await api("/api/docker/resources");
+}
+
 function removeAgentLocalState(agentId) {
   state.config.agents = collection("agents").filter((agent) => itemId(agent) !== agentId);
   delete state.agentStatuses[agentId];
@@ -804,6 +811,23 @@ async function refreshDashboardInBackground() {
   } finally {
     state.dashboardLoading = false;
     if (visible || state.selectedTab === "dashboard") render();
+  }
+}
+
+async function refreshDockerResourcesInBackground() {
+  state.dockerResourcesRequested = true;
+  const visible = state.selectedTab === "resources";
+  state.dockerResourcesLoading = visible;
+  if (visible) render();
+  try {
+    await refreshDockerResources();
+    clearToast("error");
+  } catch (error) {
+    state.dockerResourcesRequested = false;
+    if (visible) showError(error.message || String(error));
+  } finally {
+    state.dockerResourcesLoading = false;
+    if (visible || state.selectedTab === "resources") render();
   }
 }
 
@@ -1221,7 +1245,12 @@ function render() {
 }
 
 function renderNotices() {
-  const loading = state.busy || (state.selectedTab === "dashboard" && state.dashboardLoading) ? renderNotice("muted", t("common.loading"), "status") : "";
+  const loading =
+    state.busy ||
+    (state.selectedTab === "dashboard" && state.dashboardLoading) ||
+    (state.selectedTab === "resources" && state.dockerResourcesLoading)
+      ? renderNotice("muted", t("common.loading"), "status")
+      : "";
   const notice = state.notice ? renderNotice(state.noticeKind || "success", state.notice, "status") : "";
   const error = state.error ? renderNotice("danger", state.error, "alert") : "";
   const notices = `${loading}${notice}${error}`;
@@ -1242,6 +1271,7 @@ function renderNotice(kind, message, role) {
 function renderSelectedTab() {
   if (!state.config) return `<div class="empty-state">${escapeHtml(t("common.loading"))}</div>`;
   if (state.selectedTab === "dashboard") return renderDashboard();
+  if (state.selectedTab === "resources") return renderDockerResources();
   if (state.selectedTab === "agents") return renderAgentEditor();
   if (state.selectedTab === "llm") return renderProfileManager("llm");
   if (state.selectedTab === "vision") return renderProfileManager("vision");
@@ -1250,6 +1280,116 @@ function renderSelectedTab() {
   if (state.selectedTab === "prompts") return renderPromptTemplates();
   if (state.selectedTab === "export") return renderExport();
   return "";
+}
+
+function renderDockerResources() {
+  const audit = state.dockerResources;
+  const expectedErrors = audit?.expected?.errors || [];
+  return `
+    <header class="section-header">
+      <div><h2>${escapeHtml(t("resources.title"))}</h2><p>${escapeHtml(t("resources.subtitle"))}</p></div>
+      <div class="button-row">
+        ${actionButton("refresh-docker-resources", "actions.refreshStatus")}
+      </div>
+    </header>
+    <details class="info-panel">
+      <summary>${escapeHtml(t("resources.aboutTitle"))}<small>${escapeHtml(t("resources.aboutSummary"))}</small></summary>
+      <dl class="data-list compact">
+        ${renderDetail(t("resources.expected"), t("resources.expectedHelp"))}
+        ${renderDetail(t("resources.conflicts"), t("resources.conflictsHelp"))}
+        ${renderDetail(t("resources.orphans"), t("resources.orphansHelp"))}
+        ${renderDetail(t("resources.untracked"), t("resources.untrackedHelp"))}
+      </dl>
+    </details>
+    <div class="resource-summary">
+      ${renderResourceSummaryMetric("resources.containers", audit?.containers)}
+      ${renderResourceSummaryMetric("resources.volumes", audit?.volumes)}
+      ${renderResourceSummaryMetric("resources.networks", audit?.networks)}
+    </div>
+    ${
+      expectedErrors.length
+        ? `<section class="result-box warning"><strong>${escapeHtml(t("resources.expectedErrors"))}</strong><pre>${escapeHtml(
+            JSON.stringify(expectedErrors, null, 2)
+          )}</pre></section>`
+        : ""
+    }
+    ${renderResourceGroup("resources.containers", audit?.containers, "container")}
+    ${renderResourceGroup("resources.volumes", audit?.volumes, "volume")}
+    ${renderResourceGroup("resources.networks", audit?.networks, "network")}
+  `;
+}
+
+function renderResourceSummaryMetric(labelKey, group) {
+  const counts = resourceCounts(group);
+  return `<div class="metric">
+    <span>${escapeHtml(t(labelKey))}</span>
+    <strong>${escapeHtml(
+      t("resources.summary")
+        .replace("{expected}", String(counts.expected))
+        .replace("{orphans}", String(counts.orphans))
+        .replace("{legacy}", String(counts.legacy))
+        .replace("{conflicts}", String(counts.conflicts))
+    )}</strong>
+  </div>`;
+}
+
+function resourceCounts(group) {
+  return {
+    expected: (group?.expected || []).length,
+    orphans: (group?.orphans || []).length,
+    legacy: (group?.legacy || []).length,
+    conflicts: (group?.conflicts || []).length
+  };
+}
+
+function renderResourceGroup(titleKey, group, kind) {
+  if (!group) return `<section class="resource-panel"><h3>${escapeHtml(t(titleKey))}</h3><div class="empty-state">${escapeHtml(t("common.loading"))}</div></section>`;
+  return `<section class="resource-panel">
+    <h3>${escapeHtml(t(titleKey))}</h3>
+    ${renderResourceBucket("resources.expected", group.expected, kind, "expected")}
+    ${renderResourceBucket("resources.conflicts", group.conflicts, kind, "conflicts")}
+    ${renderResourceBucket("resources.orphans", group.orphans, kind, "orphans")}
+    ${renderResourceBucket("resources.untracked", group.legacy, kind, "legacy")}
+  </section>`;
+}
+
+function renderResourceBucket(titleKey, rows = [], kind, bucket) {
+  return `<details class="info-panel resource-bucket" ${bucket === "conflicts" && rows.length ? "open" : ""}>
+    <summary>${escapeHtml(t(titleKey))}<small>${escapeHtml(
+      t("resources.count").replace("{count}", String(rows.length))
+    )}</small></summary>
+    ${
+      rows.length
+        ? `<div class="resource-table">${rows.map((row) => renderResourceRow(row, kind, bucket)).join("")}</div>`
+        : `<div class="empty-state">${escapeHtml(t("resources.emptyBucket"))}</div>`
+    }
+  </details>`;
+}
+
+function renderResourceRow(row, kind, bucket) {
+  const labels = row.labels || {};
+  const state = row.state || row.status || row.classification || "";
+  return `<article class="resource-row resource-${bucket}">
+    <div>
+      <strong>${escapeHtml(row.name || shortHash(row.id) || t("common.unnamed"))}</strong>
+      <span>${escapeHtml(row.classification || "")}</span>
+    </div>
+    <div>${renderDetail(t("resources.kind"), kind)}${renderDetail(t("resources.role"), row.role || "")}</div>
+    <div>${renderDetail(t("resources.agent"), row.agent_id || row.agent_name || "")}${renderDetail(t("resources.state"), state)}</div>
+    <details class="agent-detail-panel">
+      <summary>${escapeHtml(t("resources.labels"))}</summary>
+      ${renderResourceLabels(labels)}
+    </details>
+  </article>`;
+}
+
+function renderResourceLabels(labels) {
+  const entries = Object.entries(labels || {}).filter(([key]) => key.startsWith("zeroclaw.") || key.startsWith("com.docker.compose."));
+  if (!entries.length) return `<div class="empty-state compact">${escapeHtml(t("common.none"))}</div>`;
+  return `<dl class="label-list">${entries
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(value))}</dd></div>`)
+    .join("")}</dl>`;
 }
 
 function renderDashboard() {
@@ -2118,6 +2258,9 @@ async function handleAction(action) {
       await Promise.all(collection("agents").map((agent) => refreshAgentLogs(itemId(agent))));
     });
   }
+  if (action === "refresh-docker-resources") {
+    return runAction(refreshDockerResources);
+  }
   if (action === "agent-new") {
     state.selectedAgentId = "";
     state.config.agents.unshift(defaultAgent(nextId("agent", collection("agents"))));
@@ -2429,6 +2572,9 @@ function bindEvents() {
       render();
       if (tab === "dashboard" && !state.dashboardRequested) {
         await refreshDashboardInBackground();
+      }
+      if (tab === "resources" && !state.dockerResourcesRequested) {
+        await refreshDockerResourcesInBackground();
       }
       return;
     }

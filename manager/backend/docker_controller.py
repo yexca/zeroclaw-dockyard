@@ -63,6 +63,9 @@ class DockerController(Protocol):
     def reset_matrix_state(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         ...
 
+    def audit_resources(self, config: dict[str, Any]) -> dict[str, Any]:
+        ...
+
 
 class DockerApiError(Exception):
     def __init__(self, status: int, message: str, details: dict[str, Any] | None = None):
@@ -373,6 +376,69 @@ class DockerApiController:
             actions.append("matrix_state_removed_from_local")
         return self.operation_result("reset-matrix-state", spec, container or {}, actions)
 
+    def audit_resources(self, config: dict[str, Any]) -> dict[str, Any]:
+        self.configure_client(config)
+        agents = config.get("agents") if isinstance(config.get("agents"), list) else []
+        expected_containers: dict[str, dict[str, Any]] = {}
+        expected_volumes: dict[str, dict[str, Any]] = {}
+        expected_networks: dict[str, dict[str, Any]] = {}
+        expected_errors: list[dict[str, Any]] = []
+
+        for agent in agents:
+            if not isinstance(agent, dict):
+                continue
+            try:
+                spec = self.build_container_spec(config, agent)
+            except Exception as exc:
+                expected_errors.append({"agent": item_id(agent), "error": str(exc), "type": type(exc).__name__})
+                continue
+            expected_containers[spec.container_name] = {
+                "name": spec.container_name,
+                "role": "agent",
+                "agent_id": spec.agent_id,
+                "agent_name": spec.agent_name,
+                "expected": True,
+            }
+            proactive_spec = self.build_proactive_spec(config, agent, agent_spec=spec)
+            if proactive_spec:
+                expected_containers[proactive_spec.container_name] = {
+                    "name": proactive_spec.container_name,
+                    "role": "proactive",
+                    "agent_id": proactive_spec.agent_id,
+                    "agent_name": proactive_spec.agent_name,
+                    "expected": True,
+                }
+            if spec.storage_driver == "volume":
+                expected_volumes[spec.volume_name] = {
+                    "name": spec.volume_name,
+                    "role": "volume",
+                    "agent_id": spec.agent_id,
+                    "agent_name": spec.agent_name,
+                    "expected": True,
+                }
+            expected_networks[spec.network_name] = {
+                "name": spec.network_name,
+                "role": "network",
+                "expected": True,
+            }
+
+        containers = self.list_containers_for_audit(expected_containers)
+        volumes = self.list_volumes_for_audit(expected_volumes)
+        networks = self.list_networks_for_audit(expected_networks)
+
+        return {
+            "checked_at": self._now(),
+            "expected": {
+                "containers": list(expected_containers.values()),
+                "volumes": list(expected_volumes.values()),
+                "networks": list(expected_networks.values()),
+                "errors": expected_errors,
+            },
+            "containers": self.classify_container_resources(containers, expected_containers),
+            "volumes": self.classify_named_resources(volumes, expected_volumes),
+            "networks": self.classify_named_resources(networks, expected_networks),
+        }
+
     def reconcile_proactive_container(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec") -> list[str]:
         proactive_spec = self.build_proactive_spec(config, agent, agent_spec=agent_spec)
         existing = self.find_container(proactive_spec) if proactive_spec else None
@@ -682,6 +748,112 @@ class DockerApiController:
                 raise
         self.client.request("POST", "/volumes/create", payload={"Name": volume_name, "Labels": {MANAGER_LABEL: "true"}})
 
+    def list_containers_for_audit(self, expected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        containers = self.client.request("GET", "/containers/json", query={"all": 1})
+        rows: list[dict[str, Any]] = []
+        for container in containers if isinstance(containers, list) else []:
+            names = [str(name).lstrip("/") for name in container.get("Names") or []]
+            labels = container.get("Labels") or {}
+            if (
+                labels.get(MANAGER_LABEL) == "true"
+                or any(name in expected for name in names)
+                or any("zeroclaw" in name for name in names)
+            ):
+                rows.append(container)
+        return rows
+
+    def list_volumes_for_audit(self, expected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        try:
+            result = self.client.request("GET", "/volumes")
+        except DockerApiError as exc:
+            if exc.status == 404:
+                return []
+            raise
+        volumes = result.get("Volumes") if isinstance(result, dict) else []
+        rows: list[dict[str, Any]] = []
+        for volume in volumes if isinstance(volumes, list) else []:
+            name = str(volume.get("Name") or "")
+            labels = volume.get("Labels") or {}
+            if labels.get(MANAGER_LABEL) == "true" or name in expected or "zeroclaw" in name:
+                rows.append(volume)
+        return rows
+
+    def list_networks_for_audit(self, expected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        networks = self.client.request("GET", "/networks")
+        rows: list[dict[str, Any]] = []
+        for network in networks if isinstance(networks, list) else []:
+            name = str(network.get("Name") or "")
+            labels = network.get("Labels") or {}
+            if labels.get(MANAGER_LABEL) == "true" or name in expected or "zeroclaw" in name:
+                rows.append(network)
+        return rows
+
+    def classify_container_resources(self, containers: list[dict[str, Any]], expected: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+        buckets: dict[str, list[dict[str, Any]]] = {"expected": [], "orphans": [], "legacy": [], "conflicts": []}
+        seen_expected: set[str] = set()
+        for container in containers:
+            names = [str(name).lstrip("/") for name in container.get("Names") or []]
+            name = names[0] if names else str(container.get("Id") or "")
+            labels = container.get("Labels") or {}
+            expected_row = next((expected[item] for item in names if item in expected), None)
+            row = {
+                "id": container.get("Id"),
+                "name": name,
+                "names": names,
+                "image": container.get("Image"),
+                "state": container.get("State"),
+                "status": container.get("Status"),
+                "labels": labels,
+                "role": labels.get(ROLE_LABEL) or (expected_row or {}).get("role") or "",
+                "agent_id": labels.get(AGENT_ID_LABEL) or (expected_row or {}).get("agent_id") or "",
+                "agent_name": labels.get(AGENT_NAME_LABEL) or (expected_row or {}).get("agent_name") or "",
+            }
+            if expected_row:
+                seen_expected.add(expected_row["name"])
+                if labels.get(MANAGER_LABEL) == "true":
+                    buckets["expected"].append({**row, "classification": "expected"})
+                else:
+                    buckets["conflicts"].append({**row, "classification": "expected_name_unmanaged"})
+            elif labels.get(MANAGER_LABEL) == "true":
+                buckets["orphans"].append({**row, "classification": "managed_orphan"})
+            else:
+                buckets["legacy"].append({**row, "classification": "legacy_candidate"})
+        for name, expected_row in expected.items():
+            if name not in seen_expected:
+                buckets["expected"].append({**expected_row, "state": "absent", "status": "absent", "classification": "expected_absent"})
+        return buckets
+
+    def classify_named_resources(self, resources: list[dict[str, Any]], expected: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+        buckets: dict[str, list[dict[str, Any]]] = {"expected": [], "orphans": [], "legacy": [], "conflicts": []}
+        seen_expected: set[str] = set()
+        for resource in resources:
+            name = str(resource.get("Name") or "")
+            labels = resource.get("Labels") or {}
+            expected_row = expected.get(name)
+            row = {
+                "name": name,
+                "driver": resource.get("Driver"),
+                "scope": resource.get("Scope"),
+                "labels": labels,
+                "role": labels.get(ROLE_LABEL) or (expected_row or {}).get("role") or "",
+                "agent_id": labels.get(AGENT_ID_LABEL) or (expected_row or {}).get("agent_id") or "",
+                "agent_name": labels.get(AGENT_NAME_LABEL) or (expected_row or {}).get("agent_name") or "",
+            }
+            if expected_row:
+                seen_expected.add(name)
+                if labels.get(MANAGER_LABEL) == "true":
+                    buckets["expected"].append({**row, "classification": "expected"})
+                else:
+                    buckets["conflicts"].append({**row, "classification": "expected_name_unlabeled"})
+            elif labels.get(MANAGER_LABEL) == "true":
+                buckets["orphans"].append({**row, "classification": "managed_orphan"})
+            else:
+                buckets["legacy"].append({**row, "classification": "legacy_candidate"})
+        for name, expected_row in expected.items():
+            if name not in seen_expected:
+                buckets["expected"].append({**expected_row, "state": "absent", "status": "absent", "classification": "expected_absent"})
+        return buckets
+
     def sync_local_to_runtime(self, spec: "ContainerSpec") -> None:
         spec.local_instance_dir.mkdir(parents=True, exist_ok=True)
         (spec.local_instance_dir / "workspace").mkdir(parents=True, exist_ok=True)
@@ -981,6 +1153,16 @@ class FakeDockerController:
 
     def reset_matrix_state(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         return self._operation("reset-matrix-state", agent, "stubbed")
+
+    def audit_resources(self, config: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "checked_at": self._now(),
+            "expected": {"containers": [], "volumes": [], "networks": [], "errors": []},
+            "containers": {"expected": [], "orphans": [], "legacy": [], "conflicts": []},
+            "volumes": {"expected": [], "orphans": [], "legacy": [], "conflicts": []},
+            "networks": {"expected": [], "orphans": [], "legacy": [], "conflicts": []},
+            "controller": "fake",
+        }
 
     def _operation(self, operation: str, agent: dict[str, Any], state: str) -> dict[str, Any]:
         return {

@@ -28,7 +28,8 @@
     "matrix": "Matrix Profiles",
     "mcp": "MCP Profiles",
     "prompts": "Prompt Templates",
-    "export": "Export"
+    "export": "Export",
+    "resources": "Docker Resources"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -359,5 +360,32 @@
       "maxImageTurns": "How many recent conversation turns keep image data. Use 0 to disable age trimming.",
       "allowRemoteFetch": "Allow ZeroClaw to fetch http/https image URLs. Local files and Matrix attachments do not require this."
     }
+  },
+  "resources": {
+    "title": "Docker Resources",
+    "subtitle": "Read-only audit of containers, volumes, and networks that are expected, orphaned, legacy-looking, or conflicting.",
+    "containers": "Containers",
+    "volumes": "Volumes",
+    "networks": "Networks",
+    "expected": "Expected",
+    "orphans": "Managed orphans",
+    "legacy": "Untracked ZeroClaw-named",
+    "untracked": "Untracked ZeroClaw-named",
+    "conflicts": "Needs review",
+    "count": "{count} resources",
+    "emptyBucket": "No resources in this group.",
+    "summary": "{expected} expected / {orphans} orphan / {legacy} untracked / {conflicts} review",
+    "expectedErrors": "Some configured agents could not be evaluated for expected Docker resources.",
+    "kind": "Kind",
+    "role": "Role",
+    "agent": "Agent",
+    "state": "State",
+    "labels": "Labels",
+    "aboutTitle": "How resources are classified",
+    "aboutSummary": "Open for the exact matching rules.",
+    "expectedHelp": "The current manager configuration expects this resource name, and Docker labels mark it as manager-owned.",
+    "conflictsHelp": "The current configuration expects this resource name, but the resource is missing manager ownership labels. This often means an older version created it, so review before modifying it.",
+    "orphansHelp": "Docker labels mark this resource as manager-owned, but the current configuration no longer expects it.",
+    "untrackedHelp": "The resource name contains zeroclaw, but it is not expected by the current configuration and has no manager ownership label. It may belong to another local setup."
   }
 }

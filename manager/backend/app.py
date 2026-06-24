@@ -158,6 +158,10 @@ class ManagerHandler(BaseHTTPRequestHandler):
             success(self, 200, self.build_dashboard())
             return
 
+        if method == "GET" and path == "/api/docker/resources":
+            success(self, 200, DOCKER.audit_resources(STORE.load()))
+            return
+
         if method == "GET" and path == "/api/history":
             success(self, 200, HISTORY.list(limit=self.parse_limit(query, default=100, maximum=500)))
             return
