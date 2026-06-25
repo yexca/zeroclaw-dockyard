@@ -1,0 +1,7 @@
+id: mcp-home
+enabled: false
+server_name: home
+transport: sse
+url: http://host.docker.internal:8787/mcp
+deferred_loading: false
+tool_timeout_secs: 120

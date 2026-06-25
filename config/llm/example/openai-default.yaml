@@ -1,0 +1,9 @@
+id: openai-default
+label: OpenAI
+provider_family: openai
+provider_alias: default
+model: gpt-5.4
+base_url: https://api.openai.com/v1
+wire_api: chat_completions
+timeout_secs: 120
+requires_openai_auth: true

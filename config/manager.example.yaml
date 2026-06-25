@@ -1,6 +1,10 @@
 # Copy to config/manager.yaml for local use.
 
-version: 1
+version: 2
+
+webui:
+  default_language: en
+  default_theme: system
 
 server:
   bind_host: 127.0.0.1
@@ -19,12 +23,6 @@ paths:
   secrets_file: /app/config/secrets.yaml
   generated_dir: /app/config/generated
   instances_dir: /app/instances
-  # Host paths are used only when docker.storage_driver is bind.
-  # Override these if bind mode cannot infer the project path.
-  # host_project_dir: /absolute/path/to/zeroclaw-dockyard
-  # host_instances_dir: /absolute/path/to/zeroclaw-dockyard/instances
-  # host_bootstrap_dir: /absolute/path/to/zeroclaw-dockyard/bootstrap
-  # host_shared_dir: /absolute/path/to/zeroclaw-dockyard/shared
 
 skills:
   allow_scripts: false
@@ -44,25 +42,8 @@ skills:
     nudge_interval_iterations: 10
     max_review_iterations: 8
 
-skill_bundles:
-  - id: core
-    directory: shared/skills/core
-    include: []
-    exclude: []
-
 defaults:
   zeroclaw_image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
-  matrix:
-    homeserver: https://matrix.example.com
-    allowed_rooms:
-      - "!roomid:matrix.example.com"
-    mention_only: false
-    interrupt_on_new_message: true
-    reply_in_thread: false
-    ack_reactions: true
-    stream_mode: multi_message
-    multi_message_delay_ms: 800
-    channel_debounce_ms: 0
 
 heartbeat:
   enabled: false
@@ -88,131 +69,12 @@ runtime:
   shell_timeout_secs: 300
   shell_tool_timeout_secs: 300
 
-profiles:
-  llm:
-    - id: deepseek-text
-      provider_family: deepseek
-      provider_alias: text
-      model: deepseek-v4-flash
-      base_url: https://api.deepseek.com/v1
-      wire_api: chat_completions
-      timeout_secs: 120
-    - id: ollama-local
-      provider_family: ollama
-      provider_alias: local
-      model: qwen2.5:14b
-      base_url: http://host.docker.internal:11434
-      wire_api: chat_completions
-      timeout_secs: 600
-    - id: gemini-flash
-      provider_family: gemini
-      provider_alias: flash
-      model: gemini-2.5-flash
-      timeout_secs: 120
-  vision:
-    - id: vision-default
-      provider_family: custom
-      provider_alias: vision
-      model: gpt-4o
-      base_url: https://api.openai.com/v1
-      wire_api: chat_completions
-      timeout_secs: 120
-      allow_remote_fetch: false
-      max_images: 4
-      max_image_size_mb: 5
-      max_image_turns: 2
-  matrix:
-    - id: matrix-default
-      homeserver: https://matrix.example.com
-      allowed_rooms:
-        - "!roomid:matrix.example.com"
-      mention_only: false
-      interrupt_on_new_message: true
-      reply_in_thread: false
-      ack_reactions: true
-      stream_mode: multi_message
-      multi_message_delay_ms: 800
-      channel_debounce_ms: 0
-  mcp:
-    - id: mcp-home
-      enabled: false
-      server_name: home
-      transport: sse
-      url: http://host.docker.internal:8787/mcp
-      deferred_loading: false
-      tool_timeout_secs: 120
-
-prompt_templates:
-  - id: default
-    name: Default workspace
-    files:
-      AGENTS.md: ""
-      IDENTITY.md: ""
-      SOUL.md: ""
-      MEMORY.md: ""
-      TOOLS.md: ""
-      USER.md: ""
-      HEARTBEAT.md: ""
-
-agents:
-  - id: agent1
-    enabled: true
-    host_port: 42641
-    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
-    llm_profile: deepseek-text
-    vision_profile: vision-default
-    matrix_profile: matrix-default
-    mcp_profile: mcp-home
-    prompt_template: default
-    skill_bundles:
-      - core
-    proactive:
-      enabled: true
-      random_min_minutes: 120
-      random_max_minutes: 240
-      poll_seconds: 300
-      quiet_hours: "23-8"
-      timezone: Asia/Tokyo
-      channel: matrix.home
-      target: ""
-      prompt: 'You are being invoked by the proactive sidecar, not by the user. Review PROACTIVE.md, memory, and current context. If there is a concrete, timely reason to contact the user, send one short Matrix message with send_message_to_peer using the configured channel and peer target. If there is no useful reason, respond exactly with "skip".'
-    matrix:
-      user_id: "@agent1:matrix.example.com"
-      device_id: ZEROCLAW_AGENT1
-      external_peers:
-        - "@you:matrix.example.com"
-        - "#agent1-room:matrix.example.com"
-  - id: agent2
-    enabled: true
-    host_port: 42642
-    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
-    llm_profile: ollama-local
-    vision_profile: vision-default
-    matrix_profile: matrix-default
-    mcp_profile: mcp-home
-    prompt_template: default
-    skill_bundles:
-      - core
-    matrix:
-      user_id: "@agent2:matrix.example.com"
-      device_id: ZEROCLAW_AGENT2
-      external_peers:
-        - "@you:matrix.example.com"
-        - "#agent2-room:matrix.example.com"
-  - id: agent3
-    enabled: true
-    host_port: 42643
-    image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
-    llm_profile: gemini-flash
-    vision_profile: vision-default
-    matrix_profile: matrix-default
-    mcp_profile: mcp-home
-    prompt_template: default
-    skill_bundles:
-      - core
-    matrix:
-      user_id: "@agent3:matrix.example.com"
-      device_id: ZEROCLAW_AGENT3
-      external_peers:
-        - "@you:matrix.example.com"
-        - "#agent3-room:matrix.example.com"
+config_modules:
+  llm_dir: config/llm
+  vision_dir: config/vision
+  matrix_dir: config/matrix
+  mcp_dir: config/mcp
+  agents_dir: config/agents
+  prompts_dir: config/prompts
+  skills_dir: config/skills
+  secrets_file: config/secrets.yaml

@@ -7,10 +7,32 @@ manager/frontend/node_modules/
 
 # Local WebUI manager configuration. Commit only *.example.yaml files.
 config/manager.yaml
+config/manager.legacy-*.yaml
 config/secrets.yaml
 config/manager.local.yaml
 config/secrets.local.yaml
 config/*.local.yaml
+config/llm/*.yaml
+config/vision/*.yaml
+config/matrix/*.yaml
+config/mcp/*.yaml
+config/agents/*.yaml
+config/skills/*.yaml
+config/prompts/*
+!config/prompts/example/
+!config/prompts/example/**
+!config/llm/example/
+!config/llm/example/*.yaml
+!config/vision/example/
+!config/vision/example/*.yaml
+!config/matrix/example/
+!config/matrix/example/*.yaml
+!config/mcp/example/
+!config/mcp/example/*.yaml
+!config/agents/example/
+!config/agents/example/*.yaml
+!config/skills/example/
+!config/skills/example/*.yaml
 config/generated/*
 !config/generated/.gitkeep
 

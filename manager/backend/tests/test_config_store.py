@@ -44,25 +44,89 @@ class ConfigStoreTest(unittest.TestCase):
             "PROACTIVE.md": "# PROACTIVE.md\n\n# Optional proactive service",
         }.items():
             (templates_dir / filename).write_text(content, encoding="utf-8")
-        self.example_path.write_text(
-            yaml.safe_dump(
-                {
-                    "version": 1,
-                    "profiles": {
-                        "llm": [{"id": "deepseek-text", "model": "deepseek-chat"}],
-                        "matrix": [{"id": "matrix-main", "homeserver": "https://matrix.example.com"}],
-                        "mcp": [{"id": "gateway", "enabled": True}],
-                    },
-                    "prompt_templates": [{"id": "default", "files": {"AGENTS.md": ""}}],
-                    "agents": [{"id": "agent1", "enabled": True, "llm_profile": "deepseek-text"}],
-                }
-            ),
-            encoding="utf-8",
+        self.write_modular_config(
+            {
+                "profiles": {
+                    "llm": [{"id": "deepseek-text", "model": "deepseek-chat"}],
+                    "matrix": [{"id": "matrix-main", "homeserver": "https://matrix.example.com"}],
+                    "mcp": [{"id": "gateway", "enabled": True}],
+                },
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": ""}}],
+                "agents": [{"id": "agent1", "enabled": True, "llm_profile": "deepseek-text"}],
+            },
+            self.example_path,
         )
         self.store = ConfigStore(self.config_path, self.example_path, self.generated_dir)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
+
+    def write_modular_config(self, payload: dict, root_path: Path | None = None) -> None:
+        root = Path(self.temp_dir.name)
+        config_root = root / "config"
+        modules = {
+            "llm_dir": str(config_root / "llm"),
+            "vision_dir": str(config_root / "vision"),
+            "matrix_dir": str(config_root / "matrix"),
+            "mcp_dir": str(config_root / "mcp"),
+            "agents_dir": str(config_root / "agents"),
+            "prompts_dir": str(config_root / "prompts"),
+            "skills_dir": str(config_root / "skills"),
+            "secrets_file": str(config_root / "secrets.yaml"),
+        }
+        root_payload = {
+            "version": 2,
+            "paths": {"instances_dir": str(root / "instances")},
+            "config_modules": modules,
+        }
+        for key, value in payload.items():
+            if key not in {"profiles", "prompt_templates", "agents", "skill_bundles"}:
+                root_payload[key] = value
+        (root_path or self.config_path).write_text(yaml.safe_dump(root_payload, sort_keys=False), encoding="utf-8")
+        profiles = payload.get("profiles") if isinstance(payload.get("profiles"), dict) else {}
+        for kind in ("llm", "vision", "matrix", "mcp"):
+            for item in profiles.get(kind, []) if isinstance(profiles.get(kind), list) else []:
+                directory = Path(modules[f"{kind}_dir"])
+                directory.mkdir(parents=True, exist_ok=True)
+                (directory / f"{item['id']}.yaml").write_text(yaml.safe_dump(item, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        for item in payload.get("agents", []) if isinstance(payload.get("agents"), list) else []:
+            directory = Path(modules["agents_dir"])
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / f"{item['id']}.yaml").write_text(yaml.safe_dump(item, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        for item in payload.get("skill_bundles", []) if isinstance(payload.get("skill_bundles"), list) else []:
+            directory = Path(modules["skills_dir"])
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / f"{item['id']}.yaml").write_text(yaml.safe_dump(item, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        for template in payload.get("prompt_templates", []) if isinstance(payload.get("prompt_templates"), list) else []:
+            prompt_dir = Path(modules["prompts_dir"]) / template["id"]
+            prompt_dir.mkdir(parents=True, exist_ok=True)
+            files = template.get("files", {})
+            manifest_files = {}
+            for filename, content in files.items():
+                (prompt_dir / filename).write_text(str(content), encoding="utf-8")
+                manifest_files[filename] = filename
+            manifest = {"id": template["id"], "name": template.get("name", template["id"]), "files": manifest_files}
+            (prompt_dir / "manifest.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+    def modular_payload(self, payload: dict) -> dict:
+        root = Path(self.temp_dir.name)
+        config_root = root / "config"
+        base = {
+            "version": 2,
+            "paths": {"instances_dir": str(root / "instances")},
+            "config_modules": {
+                "llm_dir": str(config_root / "llm"),
+                "vision_dir": str(config_root / "vision"),
+                "matrix_dir": str(config_root / "matrix"),
+                "mcp_dir": str(config_root / "mcp"),
+                "agents_dir": str(config_root / "agents"),
+                "prompts_dir": str(config_root / "prompts"),
+                "skills_dir": str(config_root / "skills"),
+                "secrets_file": str(config_root / "secrets.yaml"),
+            },
+        }
+        base.update(payload)
+        return base
 
     def test_loads_example_and_normalizes_defaults(self) -> None:
         config = self.store.load()
@@ -72,7 +136,10 @@ class ConfigStoreTest(unittest.TestCase):
         self.assertEqual(config["agents"][0]["id"], "agent1")
 
     def test_load_adds_default_prompt_template_when_missing(self) -> None:
-        self.config_path.write_text(yaml.safe_dump({"version": 1, "prompt_templates": []}), encoding="utf-8")
+        self.config_path.write_text(
+            yaml.safe_dump(self.modular_payload({"prompt_templates": []}), sort_keys=False),
+            encoding="utf-8",
+        )
 
         config = self.store.load()
         template = config["prompt_templates"][0]
@@ -115,7 +182,15 @@ class ConfigStoreTest(unittest.TestCase):
         result = self.store.export({"filename": "resolved.test.yaml"})
 
         self.assertTrue(Path(result["path"]).exists())
-        self.assertEqual(result["config"]["version"], 1)
+        self.assertEqual(result["config"]["version"], 2)
+
+    def test_legacy_single_file_config_requires_migration(self) -> None:
+        self.config_path.write_text(yaml.safe_dump({"version": 1, "agents": []}), encoding="utf-8")
+
+        with self.assertRaises(ConfigError) as context:
+            self.store.load()
+
+        self.assertEqual(context.exception.code, "legacy_config_requires_migration")
 
     def test_resource_decisions_are_persisted(self) -> None:
         self.store.update_resource_decision("ignore", "volume", "zeroclaw-old-data")
@@ -132,8 +207,7 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_rotate_matrix_device_id_updates_agent_override(self) -> None:
         self.store.update_full_config(
-            {
-                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+            self.modular_payload({
                 "profiles": {
                     "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
                     "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token", "device_id": "PROFILE_DEVICE"}],
@@ -148,7 +222,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
-            }
+            })
         )
 
         result = self.store.rotate_matrix_device_id("agent1")
@@ -160,8 +234,7 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_apply_prompt_template_writes_workspace_files(self) -> None:
         self.store.update_full_config(
-            {
-                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+            self.modular_payload({
                 "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
                 "profiles": {
                     "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
@@ -179,7 +252,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
-            }
+            })
         )
 
         result = self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
@@ -194,8 +267,7 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_agent_workspace_initialized_requires_written_files(self) -> None:
         self.store.update_full_config(
-            {
-                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+            self.modular_payload({
                 "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
                 "profiles": {
                     "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
@@ -212,7 +284,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
-            }
+            })
         )
         config = self.store.load()
         agent = self.store.get_agent("agent1")
@@ -223,7 +295,7 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_update_full_config_rejects_validation_errors(self) -> None:
         with self.assertRaises(ConfigError) as context:
-            self.store.update_full_config({"agents": [{"id": "bad agent", "host_port": 70000}]})
+            self.store.update_full_config(self.modular_payload({"agents": [{"id": "bad agent", "host_port": 70000}]}))
 
         self.assertEqual(context.exception.code, "validation_failed")
 
@@ -243,7 +315,7 @@ class ConfigStoreTest(unittest.TestCase):
         workspace.mkdir(parents=True)
         (workspace / "AGENTS.md").write_text("keep me", encoding="utf-8")
         self.store.update_full_config(
-            {
+            self.modular_payload({
                 "paths": {"instances_dir": str(instances_dir)},
                 "profiles": {
                     "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
@@ -260,7 +332,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
-            }
+            })
         )
 
         result = self.store.delete_agent("agent1")
@@ -270,8 +342,7 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_export_redacts_secrets_by_default(self) -> None:
         self.store.update_full_config(
-            {
-                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+            self.modular_payload({
                 "profiles": {
                     "llm": [{"id": "remote", "provider_family": "openai", "provider_alias": "main", "model": "gpt", "api_key": "secret-key"}],
                     "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "matrix-token"}],
@@ -287,7 +358,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
-            }
+            })
         )
 
         result = self.store.export({"agent": "agent1"})

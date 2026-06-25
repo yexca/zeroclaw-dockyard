@@ -34,6 +34,25 @@ DEFAULT_PROMPT_TEMPLATE_FILES = [
     "HEARTBEAT.md",
     "PROACTIVE.md",
 ]
+MODULE_COLLECTIONS = {
+    "llm": ("profiles", "llm", "llm_dir"),
+    "vision": ("profiles", "vision", "vision_dir"),
+    "matrix": ("profiles", "matrix", "matrix_dir"),
+    "mcp": ("profiles", "mcp", "mcp_dir"),
+    "agents": ("agents", None, "agents_dir"),
+    "skill_bundles": ("skill_bundles", None, "skills_dir"),
+}
+DEFAULT_CONFIG_MODULES = {
+    "llm_dir": "config/llm",
+    "vision_dir": "config/vision",
+    "matrix_dir": "config/matrix",
+    "mcp_dir": "config/mcp",
+    "agents_dir": "config/agents",
+    "prompts_dir": "config/prompts",
+    "skills_dir": "config/skills",
+    "secrets_file": "config/secrets.yaml",
+}
+MOJIBAKE_MARKERS = ("\u9287", "\u935d", "\u93c0", "\u20ac", "\ufffd", "\u6d93", "\u7d31", "\u9428")
 
 
 class ConfigError(Exception):
@@ -162,6 +181,11 @@ def normalize_collection(value: Any) -> list[dict[str, Any]]:
     return []
 
 
+def safe_file_stem(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(value).strip()).strip("-._")
+    return safe or "item"
+
+
 class ConfigStore:
     def __init__(self, config_path: Path, example_path: Path, generated_dir: Path):
         self.config_path = config_path
@@ -183,16 +207,33 @@ class ConfigStore:
         raw = self._read_yaml(path)
         if not isinstance(raw, dict):
             raw = {}
+        if not self._module_mode(raw):
+            raise ConfigError(
+                "legacy_config_requires_migration",
+                "manager.yaml must use modular config. Run tools/migrate-config.py to split a legacy single-file config.",
+                {"path": str(path)},
+                409,
+            )
+        raw = self._load_module_config(raw, path)
         return self._normalize(raw)
 
     def save(self, config: dict[str, Any]) -> dict[str, Any]:
         normalized = self._normalize(config)
-        self._atomic_write_yaml(self.config_path, normalized)
+        if self._module_mode(normalized):
+            self._save_module_config(normalized)
+        else:
+            self._atomic_write_yaml(self.config_path, normalized)
         return normalized
 
     def update_full_config(self, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise ConfigError("invalid_payload", "Configuration payload must be an object.")
+        if not self._module_mode(payload):
+            raise ConfigError(
+                "legacy_config_requires_migration",
+                "Full config writes must use modular config. Run tools/migrate-config.py for legacy single-file configs.",
+                status=409,
+            )
         normalized = self._normalize(payload)
         validation = self.validator.validate_config(normalized, check_ports=False)
         if validation["errors"]:
@@ -420,6 +461,182 @@ class ConfigStore:
         agent = self.get_agent(identifier)
         return self.renderer.export_agent(config, agent, formats=formats, include_secrets=False)
 
+    def _module_mode(self, config: dict[str, Any]) -> bool:
+        return isinstance(config.get("config_modules"), dict)
+
+    def _module_paths(self, config: dict[str, Any]) -> dict[str, Path]:
+        modules = deep_merge(DEFAULT_CONFIG_MODULES, config.get("config_modules") if isinstance(config.get("config_modules"), dict) else {})
+        paths: dict[str, Path] = {}
+        for key, value in modules.items():
+            path = Path(str(value or DEFAULT_CONFIG_MODULES.get(key, "")))
+            paths[key] = path if path.is_absolute() else self.project_root / path
+        return paths
+
+    def _load_module_config(self, raw: dict[str, Any], source_path: Path) -> dict[str, Any]:
+        if not self._module_mode(raw):
+            return raw
+        config = copy.deepcopy(raw)
+        paths = self._module_paths(config)
+        profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
+        profiles = copy.deepcopy(profiles)
+        for kind, (top_key, child_key, dir_key) in MODULE_COLLECTIONS.items():
+            directory = paths.get(dir_key)
+            if not directory:
+                continue
+            items = self._read_module_collection(directory)
+            if not items:
+                continue
+            if top_key == "profiles" and child_key:
+                profiles[child_key] = items
+            else:
+                config[top_key] = items
+        if profiles:
+            config["profiles"] = profiles
+        prompts_dir = paths.get("prompts_dir")
+        if prompts_dir:
+            prompts = self._read_prompt_modules(prompts_dir)
+            if prompts:
+                config[PROMPT_TEMPLATE_KEY] = prompts
+        config.setdefault("paths", {})
+        if isinstance(config["paths"], dict) and paths.get("secrets_file"):
+            config["paths"].setdefault("secrets_file", str(paths["secrets_file"]))
+        config["_config_modules_loaded_from"] = str(source_path)
+        return config
+
+    def _read_module_collection(self, directory: Path) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        if not directory.is_dir():
+            return items
+        for path in sorted(directory.glob("*.yaml")):
+            if path.name.endswith(".example.yaml") or path.stem in {"example", "manifest"}:
+                continue
+            raw = self._read_yaml(path)
+            if isinstance(raw, dict):
+                item = copy.deepcopy(raw)
+                item.setdefault("id", path.stem)
+                items.append(item)
+        return items
+
+    def _read_prompt_modules(self, directory: Path) -> list[dict[str, Any]]:
+        templates: list[dict[str, Any]] = []
+        if not directory.is_dir():
+            return templates
+        for prompt_dir in sorted(child for child in directory.iterdir() if child.is_dir() and child.name != "example"):
+            manifest_path = prompt_dir / "manifest.yaml"
+            manifest = self._read_yaml(manifest_path) if manifest_path.exists() else {}
+            if not isinstance(manifest, dict):
+                manifest = {}
+            template_id = str(manifest.get("id") or prompt_dir.name)
+            files = self._read_prompt_files(prompt_dir, manifest.get("files"))
+            template = {
+                "id": template_id,
+                "name": str(manifest.get("name") or template_id),
+                "description": str(manifest.get("description") or ""),
+                "files": files,
+                "source_dir": str(prompt_dir),
+            }
+            warnings = self._prompt_warnings(files)
+            if warnings:
+                template["warnings"] = warnings
+            templates.append(template)
+        return templates
+
+    def _read_prompt_files(self, prompt_dir: Path, manifest_files: Any) -> dict[str, str]:
+        files: dict[str, str] = {}
+        if isinstance(manifest_files, dict):
+            entries = {str(name): str(path) for name, path in manifest_files.items()}
+        else:
+            entries = {path.name: path.name for path in sorted(prompt_dir.glob("*.md"))}
+        for filename, relative in entries.items():
+            if not self._safe_module_filename(filename) or "/" in relative or "\\" in relative:
+                continue
+            path = prompt_dir / relative
+            try:
+                files[filename] = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                raise ConfigError("invalid_utf8_prompt", "Prompt file must be UTF-8.", {"path": str(path), "error": str(exc)}, 422) from exc
+            except OSError:
+                files[filename] = ""
+        return files
+
+    def _save_module_config(self, config: dict[str, Any]) -> None:
+        paths = self._module_paths(config)
+        root_payload = self._module_root_payload(config)
+        self._atomic_write_yaml(self.config_path, root_payload)
+        profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
+        for kind, (_top_key, child_key, dir_key) in MODULE_COLLECTIONS.items():
+            directory = paths.get(dir_key)
+            if not directory:
+                continue
+            if child_key:
+                items = profiles.get(child_key) if isinstance(profiles.get(child_key), list) else []
+            else:
+                items = config.get(kind) if isinstance(config.get(kind), list) else []
+            self._write_module_collection(directory, items)
+        prompts_dir = paths.get("prompts_dir")
+        if prompts_dir:
+            self._write_prompt_modules(prompts_dir, config.get(PROMPT_TEMPLATE_KEY) if isinstance(config.get(PROMPT_TEMPLATE_KEY), list) else [])
+
+    def _module_root_payload(self, config: dict[str, Any]) -> dict[str, Any]:
+        excluded = {"profiles", "agents", PROMPT_TEMPLATE_KEY, SKILL_BUNDLE_KEY, "_config_modules_loaded_from"}
+        payload = {key: copy.deepcopy(value) for key, value in config.items() if key not in excluded}
+        payload["version"] = max(2, int(payload.get("version") or 2))
+        payload.setdefault("config_modules", copy.deepcopy(DEFAULT_CONFIG_MODULES))
+        return payload
+
+    def _write_module_collection(self, directory: Path, items: list[Any]) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            identifier = item_id(item)
+            if not identifier:
+                continue
+            path = directory / f"{safe_file_stem(identifier)}.yaml"
+            self._atomic_write_yaml(path, copy.deepcopy(item))
+
+    def _write_prompt_modules(self, directory: Path, templates: list[Any]) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        for template in templates:
+            if not isinstance(template, dict):
+                continue
+            template_id = item_id(template)
+            if not template_id:
+                continue
+            prompt_dir = directory / safe_file_stem(template_id)
+            prompt_dir.mkdir(parents=True, exist_ok=True)
+            files = template.get("files") if isinstance(template.get("files"), dict) else {}
+            manifest_files: dict[str, str] = {}
+            for filename, content in files.items():
+                if not self._safe_module_filename(str(filename)):
+                    continue
+                target = prompt_dir / str(filename)
+                target.write_text(str(content), encoding="utf-8")
+                manifest_files[str(filename)] = str(filename)
+            manifest = {
+                "id": str(template_id),
+                "name": str(template.get("name") or template_id),
+                "description": str(template.get("description") or ""),
+                "encoding": "utf-8",
+                "files": manifest_files,
+            }
+            warnings = self._prompt_warnings({str(k): str(v) for k, v in files.items()})
+            if warnings:
+                manifest["warnings"] = warnings
+            self._atomic_write_yaml(prompt_dir / "manifest.yaml", manifest)
+
+    def _prompt_warnings(self, files: dict[str, str]) -> list[dict[str, Any]]:
+        warnings: list[dict[str, Any]] = []
+        for filename, content in files.items():
+            markers = [marker for marker in MOJIBAKE_MARKERS if marker in content]
+            if markers:
+                warnings.append({"code": "possible_mojibake", "file": filename, "markers": markers[:5]})
+        return warnings
+
+    def _safe_module_filename(self, filename: str) -> bool:
+        text = str(filename or "").strip()
+        return bool(text) and len(text) <= 128 and "/" not in text and "\\" not in text and ".." not in Path(text).parts
+
     def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         config = deep_merge(default_config(), raw)
         profiles = config.get("profiles") if isinstance(config.get("profiles"), dict) else {}
@@ -444,7 +661,7 @@ class ConfigStore:
     def _normalize_prompt_templates(self, templates: list[dict[str, Any]]) -> list[dict[str, Any]]:
         defaults = self._default_prompt_template_files()
         if not templates:
-            return [{"id": "default", "name": "Default workspace", "files": defaults}]
+            return []
         for template in templates:
             files = template.get("files")
             if not isinstance(files, dict):
@@ -488,7 +705,11 @@ class ConfigStore:
         return []
 
     def _default_prompt_template_files(self) -> dict[str, str]:
-        template_dirs = [Path(__file__).resolve().parent / "prompt_templates"]
+        module_dirs = self._module_paths({"config_modules": DEFAULT_CONFIG_MODULES})
+        template_dirs = [
+            module_dirs["prompts_dir"] / "example",
+            Path(__file__).resolve().parent / "prompt_templates",
+        ]
         result: dict[str, str] = {}
         for filename in DEFAULT_PROMPT_TEMPLATE_FILES:
             result[filename] = ""

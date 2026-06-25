@@ -1,0 +1,13 @@
+id: default
+name: Default workspace
+description: ''
+encoding: utf-8
+files:
+  AGENTS.md: AGENTS.md
+  SOUL.md: SOUL.md
+  TOOLS.md: TOOLS.md
+  IDENTITY.md: IDENTITY.md
+  USER.md: USER.md
+  MEMORY.md: MEMORY.md
+  HEARTBEAT.md: HEARTBEAT.md
+  PROACTIVE.md: PROACTIVE.md

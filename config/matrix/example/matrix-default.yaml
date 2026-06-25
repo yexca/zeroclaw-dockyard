@@ -1,0 +1,11 @@
+id: matrix-default
+homeserver: https://matrix.example.com
+allowed_rooms:
+  - "!roomid:matrix.example.com"
+mention_only: false
+interrupt_on_new_message: true
+reply_in_thread: false
+ack_reactions: true
+stream_mode: multi_message
+multi_message_delay_ms: 800
+channel_debounce_ms: 0

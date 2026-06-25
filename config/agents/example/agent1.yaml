@@ -1,0 +1,17 @@
+id: agent1
+enabled: true
+host_port: 42641
+image: ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian
+llm_profile: openai-default
+vision_profile: vision-default
+matrix_profile: matrix-default
+mcp_profile: mcp-home
+prompt_template: default
+skill_bundles:
+  - core
+matrix:
+  user_id: "@agent1:matrix.example.com"
+  device_id: ZEROCLAW_AGENT1
+  external_peers:
+    - "@you:matrix.example.com"
+    - "#agent1-room:matrix.example.com"
