@@ -169,7 +169,6 @@ class ConfigStoreTest(unittest.TestCase):
                 "agents": [
                     {
                         "id": "agent1",
-                        "name": "agent1",
                         "host_port": 42641,
                         "llm_profile": "llm",
                         "matrix_profile": "matrix",
@@ -252,7 +251,6 @@ class ConfigStoreTest(unittest.TestCase):
                 "agents": [
                     {
                         "id": "agent1",
-                        "name": "agent1",
                         "host_port": 42641,
                         "llm_profile": "llm",
                         "matrix_profile": "matrix",
@@ -280,7 +278,6 @@ class ConfigStoreTest(unittest.TestCase):
                 "agents": [
                     {
                         "id": "agent1",
-                        "name": "agent1",
                         "host_port": 42641,
                         "llm_profile": "remote",
                         "matrix_profile": "matrix",
@@ -326,22 +323,21 @@ class DockerControllerTest(unittest.TestCase):
             },
             {
                 "id": "agent1",
-                "name": "Agent One",
                 "host_port": 42641,
                 "matrix": {"user_id": "@agent1:example.test"},
             },
         )
 
-        self.assertEqual(spec.container_name, "zeroclaw-matrix-agent-one")
+        self.assertEqual(spec.container_name, "zeroclaw-matrix-agent1")
         self.assertEqual(spec.image, "example/zeroclaw:test")
         self.assertEqual(spec.network_name, "zeroclaw-dockyard_default")
         self.assertEqual(spec.labels[MANAGER_LABEL], "true")
         self.assertEqual(spec.labels[AGENT_ID_LABEL], "agent1")
-        self.assertEqual(spec.labels[AGENT_NAME_LABEL], "Agent One")
+        self.assertEqual(spec.labels[AGENT_NAME_LABEL], "agent1")
         self.assertIn("host.docker.internal:host-gateway", spec.extra_hosts)
         self.assertEqual(spec.storage_driver, "volume")
-        self.assertEqual(spec.volume_name, "zeroclaw-dockyard-agent-agent-one-data")
-        self.assertEqual(spec.local_instance_dir, Path("/app/instances") / "agent-one")
+        self.assertEqual(spec.volume_name, "zeroclaw-dockyard-agent-agent1-data")
+        self.assertEqual(spec.local_instance_dir, Path("/app/instances") / "agent1")
 
     def test_manager_label_is_required_for_operations(self) -> None:
         controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
@@ -422,7 +418,6 @@ class DockerControllerTest(unittest.TestCase):
         }
         agent = {
             "id": "agent1",
-            "name": "agent1",
             "host_port": 42641,
             "matrix": {"external_peers": ["@you:matrix.example.com"]},
             "proactive": {"enabled": True, "random_min_minutes": 10, "random_max_minutes": 20},
@@ -447,7 +442,6 @@ class DockerControllerTest(unittest.TestCase):
         }
         agent = {
             "id": "agent1",
-            "name": "agent1",
             "host_port": 42641,
             "matrix": {"external_peers": ["@you:matrix.example.com"]},
             "proactive": {"enabled": True, "agent_url": "http://gateway.local/custom"},
@@ -617,7 +611,6 @@ class AgentRendererTest(unittest.TestCase):
         }
         self.agent = {
             "id": "agent1",
-            "name": "agent1",
             "host_port": 42641,
             "llm_profile": "deepseek-text",
             "matrix_profile": "matrix-main",
@@ -748,7 +741,6 @@ class ConfigValidatorTest(unittest.TestCase):
             "agents": [
                 {
                     "id": "bad agent",
-                    "name": "bad agent",
                     "host_port": 70000,
                     "llm_profile": "remote",
                     "matrix_profile": "matrix",
@@ -761,7 +753,7 @@ class ConfigValidatorTest(unittest.TestCase):
         codes = {entry["code"] for entry in result["errors"]}
 
         self.assertFalse(result["valid"])
-        self.assertIn("invalid_agent_name", codes)
+        self.assertIn("invalid_agent_id", codes)
         self.assertIn("invalid_host_port", codes)
         self.assertIn("missing_model", codes)
         self.assertIn("missing_matrix_homeserver", codes)
@@ -772,7 +764,7 @@ class ConfigValidatorTest(unittest.TestCase):
         config = {
             "paths": {"instances_dir": str(self.root / "instances")},
             "profiles": {"llm": [], "matrix": [], "mcp": []},
-            "agents": [{"id": "agent1", "name": "agent1", "host_port": 42641}],
+            "agents": [{"id": "agent1", "host_port": 42641}],
         }
 
         with self.assertRaises(ConfigError) as context:

@@ -166,4 +166,4 @@ def history_from_env(generated_dir: Path) -> OperationHistory:
 
 
 def agent_identifier(agent: dict[str, Any]) -> str:
-    return item_id(agent) or str(agent.get("name") or "")
+    return item_id(agent) or ""

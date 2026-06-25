@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - package import path for tests
 
 
 LOCAL_API_KEY_OPTIONAL = {"ollama", "local"}
-AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
+AGENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
 
 
 class ConfigValidator:
@@ -34,7 +34,7 @@ class ConfigValidator:
         self._validate_skill_bundles(config, errors, warnings)
         self._validate_vision_profiles(config, errors, warnings)
         self._validate_gitignore(errors, warnings)
-        self._validate_agent_names(agents, errors)
+        self._validate_agent_ids(agents, errors)
 
         used_ports: dict[int, str] = {}
         for agent in agents:
@@ -43,7 +43,7 @@ class ConfigValidator:
                 errors.extend(result["errors"])
                 warnings.extend(result["warnings"])
                 port = agent.get("host_port")
-                identifier = str(item_id(agent) or agent.get("name") or "<unknown>")
+                identifier = str(item_id(agent) or "<unknown>")
                 if isinstance(port, int):
                     if port in used_ports:
                         errors.append(issue("duplicate_host_port", "host_port", "Host port is used by more than one agent.", {"port": port, "agents": [used_ports[port], identifier]}))
@@ -53,12 +53,11 @@ class ConfigValidator:
     def validate_agent(self, config: dict[str, Any], agent: dict[str, Any], check_ports: bool = False) -> dict[str, Any]:
         errors: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
-        identifier = str(item_id(agent) or agent.get("name") or "")
+        identifier = str(item_id(agent) or "")
         prefix = f"agents.{identifier}" if identifier else "agents.<unknown>"
 
-        name = str(agent.get("name") or identifier)
-        if not name or not AGENT_NAME_PATTERN.match(name):
-            errors.append(issue("invalid_agent_name", f"{prefix}.name", "Agent name must start with a letter or number and contain only letters, numbers, dot, underscore, or hyphen.", {"name": name}))
+        if not identifier or not AGENT_ID_PATTERN.match(identifier):
+            errors.append(issue("invalid_agent_id", f"{prefix}.id", "Agent id must start with a letter or number and contain only letters, numbers, dot, underscore, or hyphen.", {"id": identifier}))
 
         port = agent.get("host_port")
         if not isinstance(port, int) or port < 1 or port > 65535:
@@ -146,22 +145,21 @@ class ConfigValidator:
         if blocking:
             raise ConfigError("validation_failed", "Agent configuration is not valid for startup.", {"errors": blocking, "warnings": result["warnings"]}, 422)
 
-    def _validate_agent_names(self, agents: list[Any], errors: list[dict[str, Any]]) -> None:
+    def _validate_agent_ids(self, agents: list[Any], errors: list[dict[str, Any]]) -> None:
         seen_ids: dict[str, str] = {}
-        seen_names: dict[str, str] = {}
+        seen_container_names: dict[str, str] = {}
         for agent in agents:
             if not isinstance(agent, dict):
                 errors.append(issue("invalid_agent", "agents", "Agent entries must be objects."))
                 continue
             identifier = str(item_id(agent) or "")
-            name = str(agent.get("name") or identifier)
-            safe_name = safe_name_part(name)
+            safe_name = safe_name_part(identifier)
             if identifier in seen_ids:
-                errors.append(issue("duplicate_agent_id", "agents", "Agent id/name must be unique.", {"id": identifier, "agents": [seen_ids[identifier], name]}))
-            if safe_name in seen_names:
-                errors.append(issue("duplicate_agent_name", "agents", "Agent names must map to unique container/workspace names.", {"name": name, "normalized": safe_name, "conflict": seen_names[safe_name]}))
-            seen_ids[identifier] = name
-            seen_names[safe_name] = name
+                errors.append(issue("duplicate_agent_id", "agents", "Agent id must be unique.", {"id": identifier}))
+            if safe_name in seen_container_names:
+                errors.append(issue("duplicate_agent_container_name", "agents", "Agent ids must map to unique container/workspace names.", {"id": identifier, "normalized": safe_name, "conflict": seen_container_names[safe_name]}))
+            seen_ids[identifier] = identifier
+            seen_container_names[safe_name] = identifier
 
     def _validate_server(self, config: dict[str, Any], errors: list[dict[str, Any]], warnings: list[dict[str, Any]]) -> None:
         server = config.get("server") if isinstance(config.get("server"), dict) else {}

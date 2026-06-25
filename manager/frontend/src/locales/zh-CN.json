@@ -313,6 +313,11 @@
     "folderOpenRequested": "????????",
     "openFolderFallback": "????????"
   },
+  "dialog": {
+    "alertTitle": "提示",
+    "confirmTitle": "请确认",
+    "promptTitle": "需要输入"
+  },
   "confirm": {
     "deleteAgent": "删除这个智能体？此操作不可撤销。",
     "deleteProfile": "删除这个配置？已关联的智能体可能需要更新。",

@@ -103,7 +103,6 @@ class AgentRenderer:
             raise ConfigError("invalid_agent", "Agent requires an id.")
         resolved = copy.deepcopy(agent)
         resolved.setdefault("id", agent_identifier)
-        resolved.setdefault("name", str(agent.get("name") or agent_identifier))
 
         llm = self._resolve_profile(config, "llm", agent.get("llm_profile"))
         vision = self._resolve_profile(config, "vision", agent.get("vision_profile"), optional=True)
@@ -129,7 +128,7 @@ class AgentRenderer:
         vision = resolved.get("vision") if isinstance(resolved.get("vision"), dict) else {}
         matrix = resolved.get("matrix") if isinstance(resolved.get("matrix"), dict) else {}
         mcp = resolved.get("mcp") if isinstance(resolved.get("mcp"), dict) else {}
-        agent_name = str(resolved.get("name") or resolved.get("id"))
+        agent_name = str(resolved.get("id") or "")
         vision_family = vision.get("provider_family") or vision.get("family") or "custom"
         vision_alias = vision.get("provider_alias") or vision.get("alias") or "vision"
         vision_api_key = vision.get("api_key") or ""
@@ -313,7 +312,7 @@ class AgentRenderer:
     def workspace_dir(self, config: dict[str, Any], agent: dict[str, Any]) -> Path:
         paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
         instances_dir = Path(str(paths.get("instances_dir") or self.project_root / "instances"))
-        return instances_dir / safe_name_part(str(agent.get("name") or agent.get("id"))) / "workspace"
+        return instances_dir / safe_name_part(str(agent.get("id") or "")) / "workspace"
 
     def get_prompt_template(self, config: dict[str, Any], template_id: Any) -> dict[str, Any] | None:
         templates = config.get("prompt_templates") if isinstance(config.get("prompt_templates"), list) else []

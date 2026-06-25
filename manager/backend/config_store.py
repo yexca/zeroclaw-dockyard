@@ -207,7 +207,7 @@ class ConfigStore:
         item = self._validate_item_payload(payload)
         identifier = item_id(item)
         if not identifier:
-            raise ConfigError("missing_id", "Item must include one of id, alias, name, or server_name.")
+            raise ConfigError("missing_id", "Item must include one of id, alias, or server_name.")
         config = self.load()
         collection = self._get_collection(config, kind)
         if any(item_id(existing) == identifier for existing in collection):

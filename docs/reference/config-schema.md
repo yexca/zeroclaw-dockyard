@@ -238,6 +238,6 @@ config files out of Git either way.
 
 ## Validation
 
-Validation checks agent names, duplicate ports, profile references, Matrix
+Validation checks agent ids, duplicate ports, profile references, Matrix
 credentials, Matrix peers, workspace writability, server bind address, and
 local ignore rules.

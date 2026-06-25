@@ -500,7 +500,7 @@ class DockerApiController:
         agent_identifier = item_id(resolved)
         if not agent_identifier:
             raise ConfigError("invalid_agent", "Agent requires an id or name.")
-        agent_name = str(resolved.get("name") or agent_identifier)
+        agent_name = str(agent_identifier)
         safe_name = safe_container_part(agent_name)
         host_port = resolved.get("host_port")
         if not isinstance(host_port, int):
@@ -1343,7 +1343,7 @@ class FakeDockerController:
         }
 
     def _agent_id(self, agent: dict[str, Any]) -> str:
-        return str(agent.get("id") or agent.get("name") or "")
+        return str(agent.get("id") or "")
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()

@@ -541,7 +541,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
             except Exception as exc:  # Keep dashboard useful when one container fails.
                 status = {
                     "agent_id": identifier,
-                    "agent_name": agent.get("name") or identifier,
+                    "agent_name": identifier,
                     "state": "error",
                     "error": {"type": type(exc).__name__, "message": str(exc)},
                     "controller": "docker-api",

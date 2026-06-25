@@ -355,6 +355,11 @@
     "folderOpenRequested": "Folder open requested.",
     "openFolderFallback": "Open this folder path"
   },
+  "dialog": {
+    "alertTitle": "Notice",
+    "confirmTitle": "Please confirm",
+    "promptTitle": "Input required"
+  },
   "confirm": {
     "deleteAgent": "Delete this agent? This cannot be undone.",
     "deleteProfile": "Delete this profile? Assigned agents may need updates.",

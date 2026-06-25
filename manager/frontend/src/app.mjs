@@ -427,7 +427,8 @@ const state = {
   aiFillDescription: "",
   aiFillScrollTop: 0,
   pendingResourceDelete: null,
-  pendingResourceDeleteInput: ""
+  pendingResourceDeleteInput: "",
+  dialog: null
 };
 
 let i18n;
@@ -714,7 +715,7 @@ function validateUrlLike(value, key, { required = false } = {}) {
 }
 
 function alertValidation(error) {
-  window.alert(error.message || String(error));
+  return alertDialog(error.message || String(error));
 }
 
 function cleanEmptyValues(value) {
@@ -802,6 +803,50 @@ async function runAction(action, successKey) {
     state.busy = false;
     render();
   }
+}
+
+function showDialog(options) {
+  return new Promise((resolve) => {
+    if (state.dialog) state.dialog.resolve(state.dialog.type === "prompt" ? null : false);
+    const type = options.type || "alert";
+    state.dialog = {
+      type,
+      title: options.title || "",
+      message: options.message || "",
+      confirmKey: options.confirmKey || (type === "alert" ? "actions.confirm" : "actions.confirm"),
+      cancelKey: options.cancelKey || "actions.cancel",
+      danger: options.danger === true,
+      input: type === "prompt" ? String(options.defaultValue ?? "") : "",
+      placeholder: options.placeholder || "",
+      resolve
+    };
+    render();
+    requestAnimationFrame(() => {
+      const node = document.querySelector("[data-dialog-input]") || document.querySelector("[data-dialog-confirm]");
+      node?.focus();
+      if (node?.matches?.("[data-dialog-input]")) node.select?.();
+    });
+  });
+}
+
+function alertDialog(message, title = "") {
+  return showDialog({ type: "alert", message, title });
+}
+
+function confirmDialog(message, { title = "", danger = true, confirmKey = "actions.confirm" } = {}) {
+  return showDialog({ type: "confirm", message, title, danger, confirmKey });
+}
+
+function promptDialog(message, defaultValue = "", { title = "" } = {}) {
+  return showDialog({ type: "prompt", message, defaultValue, title });
+}
+
+function settleDialog(result) {
+  const dialog = state.dialog;
+  if (!dialog) return;
+  state.dialog = null;
+  dialog.resolve(result);
+  render();
 }
 
 async function refreshConfig(shouldRender = true) {
@@ -1397,6 +1442,7 @@ function render() {
     ${renderAiFillDialog()}
     ${renderResourceDeleteDialog()}
     ${renderSupportFileDialog()}
+    ${renderDialog()}
   `;
 }
 
@@ -1657,6 +1703,36 @@ function renderSupportFileDialog() {
         <footer class="button-row modal-actions">
           ${actionButton("support-file-dialog-close", "actions.cancel", "secondary")}
           ${actionButton(isUpload ? "support-file-upload-save" : "support-file-create-save", isUpload ? "actions.upload" : "actions.create", "primary")}
+        </footer>
+      </section>
+    </div>`;
+}
+
+function renderDialog() {
+  const dialog = state.dialog;
+  if (!dialog) return "";
+  const isPrompt = dialog.type === "prompt";
+  const isAlert = dialog.type === "alert";
+  const confirmVariant = dialog.danger ? "danger" : "primary";
+  return `
+    <div class="modal-backdrop" role="presentation" data-dialog-backdrop>
+      <section class="modal-panel app-dialog" role="${isAlert ? "alertdialog" : "dialog"}" aria-modal="true" aria-labelledby="app-dialog-title">
+        <header class="modal-header">
+          <div>
+            <h3 id="app-dialog-title">${escapeHtml(dialog.title || t(`dialog.${dialog.type}Title`))}</h3>
+          </div>
+        </header>
+        <p class="app-dialog-message">${escapeHtml(dialog.message)}</p>
+        ${
+          isPrompt
+            ? `<label class="field field-wide">
+                <input data-dialog-input value="${escapeHtml(dialog.input)}" placeholder="${escapeHtml(dialog.placeholder)}" autocomplete="off" />
+              </label>`
+            : ""
+        }
+        <footer class="button-row modal-actions">
+          ${isAlert ? "" : `<button type="button" class="button secondary text-button" data-dialog-cancel>${escapeHtml(t(dialog.cancelKey))}</button>`}
+          <button type="button" class="button ${confirmVariant} text-button" data-dialog-confirm>${escapeHtml(t(dialog.confirmKey))}</button>
         </footer>
       </section>
     </div>`;
@@ -2917,7 +2993,7 @@ function nextId(prefix, items) {
 }
 
 async function confirmDanger(messageKey) {
-  return window.confirm(t(messageKey));
+  return confirmDialog(t(messageKey));
 }
 
 async function handleAction(action) {
@@ -3318,8 +3394,8 @@ async function handleResourceAction(actionText) {
     return;
   }
   if (resource.action === "migrate") {
-    const targetName = window.prompt(t("resources.migrateTargetPrompt"), `${resource.name}-migrated`);
-    if (!targetName) return;
+    const targetName = await promptDialog(t("resources.migrateTargetPrompt"), `${resource.name}-migrated`);
+    if (!targetName || !targetName.trim()) return;
     payload.target_name = targetName.trim();
   }
   await runAction(async () => {
@@ -3397,7 +3473,7 @@ async function resetMatrixState() {
       showError(t("messages.resetMatrixRunning"));
       return;
     }
-    if (!window.confirm(t("confirm.resetMatrixState"))) return;
+    if (!(await confirmDialog(t("confirm.resetMatrixState")))) return;
     await api(`/api/agents/${encodeURIComponent(agentId)}/reset-matrix-state`, { method: "POST", body: "{}" });
     await refreshConfig(false);
     showNotice(t("messages.resetMatrixState"));
@@ -3604,14 +3680,14 @@ async function copySkillPath(bundleId, skillName = "") {
     const result = await api(`/api/skills/bundles/${encodeURIComponent(bundleId)}${suffix}`);
     const path = result.host_path || result.container_path || "";
     if (!path) {
-      window.alert(t("messages.pathUnavailable"));
+      await alertDialog(t("messages.pathUnavailable"));
       return;
     }
     try {
       await navigator.clipboard.writeText(path);
       showNotice(t("messages.pathCopied"));
     } catch (_error) {
-      window.prompt(t("messages.copyPathPrompt"), path);
+      await promptDialog(t("messages.copyPathPrompt"), path);
     }
   } catch (error) {
     showError(error.message || String(error));
@@ -3631,10 +3707,10 @@ async function openSkillFolder(bundleId, skillName = "") {
     }
     const path = result.host_path || result.container_path || "";
     if (path) {
-      window.prompt(t("messages.openFolderFallback"), path);
+      await promptDialog(t("messages.openFolderFallback"), path);
       return;
     }
-    window.alert(t("messages.pathUnavailable"));
+    await alertDialog(t("messages.pathUnavailable"));
   } catch (error) {
     showError(error.message || String(error));
   } finally {
@@ -3679,6 +3755,18 @@ function downloadSkillSupportFile() {
 
 function bindEvents() {
   document.addEventListener("click", async (event) => {
+    if (state.dialog) {
+      if (event.target.closest("[data-dialog-confirm]")) {
+        settleDialog(state.dialog.type === "prompt" ? state.dialog.input : true);
+        return;
+      }
+      if (event.target.closest("[data-dialog-cancel]") || event.target === event.target.closest("[data-dialog-backdrop]")) {
+        settleDialog(state.dialog.type === "prompt" ? null : false);
+        return;
+      }
+      return;
+    }
+
     if (event.target.closest("[data-notice-dismiss]")) {
       clearToast();
       render();
@@ -3806,6 +3894,9 @@ function bindEvents() {
   document.addEventListener("submit", (event) => event.preventDefault());
 
   document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-dialog-input]")) {
+      if (state.dialog) state.dialog.input = event.target.value;
+    }
     if (event.target.matches("[data-template-new-file]")) {
       state.pendingTemplateFileName = event.target.value;
     }
@@ -3816,6 +3907,19 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", async (event) => {
+    if (state.dialog) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        settleDialog(state.dialog.type === "prompt" ? null : false);
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        settleDialog(state.dialog.type === "prompt" ? state.dialog.input : true);
+        return;
+      }
+      return;
+    }
     if (!event.target.matches("[data-template-new-file]")) return;
     if (event.key === "Enter") {
       event.preventDefault();
