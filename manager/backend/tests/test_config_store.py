@@ -211,7 +211,10 @@ class ConfigStoreTest(unittest.TestCase):
         self.store.update_full_config(
             self.modular_payload({
                 "profiles": {
-                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "llm": [
+                        {"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"},
+                        {"id": "other", "provider_family": "ollama", "provider_alias": "other", "model": "qwen"},
+                    ],
                     "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token", "device_id": "PROFILE_DEVICE"}],
                     "mcp": [],
                 },
@@ -239,7 +242,10 @@ class ConfigStoreTest(unittest.TestCase):
             self.modular_payload({
                 "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
                 "profiles": {
-                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "llm": [
+                        {"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"},
+                        {"id": "other", "provider_family": "ollama", "provider_alias": "other", "model": "qwen"},
+                    ],
                     "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
                     "mcp": [],
                 },
@@ -266,6 +272,161 @@ class ConfigStoreTest(unittest.TestCase):
             (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
             "hello",
         )
+
+    def test_publish_agent_saves_applies_template_and_syncs_runtime(self) -> None:
+        self.store.update_full_config(
+            self.modular_payload({
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    }
+                ],
+            })
+        )
+        synced: list[str] = []
+
+        def sync_runtime(_config: dict, agent: dict) -> dict:
+            synced.append(agent["id"])
+            return {"operation": "sync-to-runtime", "actions": ["stubbed"]}
+
+        result = self.store.publish_agent(
+            "agent1",
+            {
+                "mode": "overwrite",
+                "agent": {
+                    "id": "agent1",
+                    "host_port": 42642,
+                    "llm_profile": "llm",
+                    "matrix_profile": "matrix",
+                    "prompt_template": "default",
+                    "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                },
+            },
+            sync_runtime,
+        )
+
+        self.assertTrue(result["published"])
+        self.assertTrue(result["validation"]["valid"])
+        self.assertEqual(result["agent"]["host_port"], 42642)
+        self.assertIn("AGENTS.md", result["workspace"]["written"])
+        self.assertEqual(result["runtime"]["operation"], "sync-to-runtime")
+        self.assertEqual(synced, ["agent1"])
+        self.assertEqual(
+            (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
+            "hello",
+        )
+
+    def test_publish_agent_can_skip_runtime_sync(self) -> None:
+        self.store.update_full_config(
+            self.modular_payload({
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    }
+                ],
+            })
+        )
+
+        result = self.store.publish_agent(
+            "agent1",
+            {"mode": "overwrite", "sync_runtime": False},
+            lambda _config, _agent: self.fail("sync should not be called"),
+        )
+
+        self.assertIsNone(result["runtime"])
+        self.assertIn("AGENTS.md", result["workspace"]["written"])
+
+    def test_publish_agent_creates_draft_agent(self) -> None:
+        self.store.update_full_config(
+            self.modular_payload({
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [],
+            })
+        )
+
+        result = self.store.publish_agent(
+            "agent1",
+            {
+                "mode": "overwrite",
+                "sync_runtime": False,
+                "agent": {
+                    "id": "agent1",
+                    "host_port": 42641,
+                    "llm_profile": "llm",
+                    "matrix_profile": "matrix",
+                    "prompt_template": "default",
+                    "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                },
+            },
+            None,
+        )
+
+        self.assertEqual(result["agent"]["id"], "agent1")
+        self.assertEqual(self.store.get_agent("agent1")["host_port"], 42641)
+        self.assertIn("AGENTS.md", result["workspace"]["written"])
+
+    def test_affected_agent_ids_for_item(self) -> None:
+        self.store.update_full_config(
+            self.modular_payload({
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": "hello"}}],
+                "profiles": {
+                    "llm": [
+                        {"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"},
+                        {"id": "other", "provider_family": "ollama", "provider_alias": "other", "model": "qwen"},
+                    ],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    },
+                    {
+                        "id": "agent2",
+                        "host_port": 42642,
+                        "llm_profile": "other",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent2:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    },
+                ],
+            })
+        )
+
+        self.assertEqual(self.store.affected_agent_ids_for_item("llm", "llm"), ["agent1"])
+        self.assertEqual(self.store.affected_agent_ids_for_item("prompt_templates", "default"), ["agent1", "agent2"])
 
     def test_update_profile_rejects_running_referenced_agent(self) -> None:
         self.store.set_agent_status_provider(lambda _config, agent: {"running": agent.get("id") == "agent1", "state": "running"})

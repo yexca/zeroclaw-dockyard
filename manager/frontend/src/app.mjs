@@ -792,6 +792,47 @@ function showError(message) {
   }
 }
 
+function syncCurrentDraftFromForm() {
+  if (!state.config) return;
+  const form = document.querySelector(".form-panel form, form.form-panel, [data-form]");
+  const kind = form?.dataset?.form;
+  try {
+    if (kind === "agent") {
+      const draft = agentFromForm(form);
+      const index = state.config.agents.findIndex((item) => itemId(item) === state.selectedAgentId);
+      if (index >= 0) state.config.agents[index] = draft;
+      return;
+    }
+    if (["llm", "vision", "matrix", "mcp"].includes(kind)) {
+      const draft = profileFromForm(kind, form);
+      const items = state.config.profiles?.[kind] || [];
+      const index = items.findIndex((item) => itemId(item) === state[`selected${kind}Id`]);
+      if (index >= 0) items[index] = draft;
+      return;
+    }
+    if (kind === "template") {
+      updateTemplateDraftFromForm();
+      return;
+    }
+    if (kind === "skills-settings") {
+      state.config.skills = skillsSettingsFromForm(form);
+      return;
+    }
+    if (kind === "skill-bundle") {
+      const draft = skillBundleFromForm(form);
+      const index = state.config.skill_bundles.findIndex((item) => itemId(item) === state.selectedSkillBundleId);
+      if (index >= 0) state.config.skill_bundles[index] = draft;
+      return;
+    }
+    if (kind === "skill-doc") {
+      const key = selectedSkillDocKey();
+      if (key) state.skillDocuments[key] = { ...(state.skillDocuments[key] || {}), ...skillDocumentFromForm(form) };
+    }
+  } catch (_error) {
+    // Preserve partially typed invalid drafts in the DOM; explicit save actions will report validation errors.
+  }
+}
+
 async function runAction(action, successKey) {
   try {
     setBusy(true);
@@ -811,6 +852,7 @@ async function runAction(action, successKey) {
 
 function showDialog(options) {
   return new Promise((resolve) => {
+    syncCurrentDraftFromForm();
     if (state.dialog) state.dialog.resolve(state.dialog.type === "prompt" ? null : false);
     const type = options.type || "alert";
     state.dialog = {
@@ -1245,6 +1287,7 @@ function renderAiFillPreservingScroll() {
 }
 
 function openAiFillDialog() {
+  syncCurrentDraftFromForm();
   updateTemplateDraftFromForm();
   const llmProfiles = collection("llm");
   state.aiFillOpen = true;
@@ -1256,6 +1299,7 @@ function openAiFillDialog() {
 }
 
 function openSupportFileDialog(kind) {
+  syncCurrentDraftFromForm();
   state.supportFileDialog = {
     kind,
     type: state.selectedSupportType,
@@ -1415,6 +1459,7 @@ const ACTION_ICONS = {
   "actions.removeFile": "trash",
   "actions.restart": "rotate",
   "actions.save": "save",
+  "actions.saveAndPublish": "save",
   "actions.start": "play",
   "actions.stop": "square",
   "actions.syncFromRuntime": "download",
@@ -2042,18 +2087,16 @@ function renderAgentForm(agent) {
     ${renderAgentProactiveFields(agent)}
     ${renderAgentAdvancedFields(agent)}
     <div class="button-row form-actions">
-      ${actionButton("agent-save", "actions.save", "primary")}
-      ${actionButton("agent-validate", "actions.validate")}
-      ${actionButton("agent-apply-template", "actions.applyTemplate", "secondary", !agent.prompt_template)}
+      ${actionButton("agent-save", "actions.saveAndPublish", "primary")}
       ${renderAgentAdvancedActions()}
     </div>
-    ${renderValidation()}
   `;
 }
 
 function renderAgentAdvancedActions() {
   return `<div class="advanced-action-cluster ${state.agentAdvancedActionsOpen ? "open" : ""}">
     <div class="advanced-action-popover" aria-hidden="${state.agentAdvancedActionsOpen ? "false" : "true"}">
+      ${actionButton("agent-apply-template", "actions.applyTemplate", "secondary", !selectedAgent()?.prompt_template)}
       ${actionButton("agent-sync-to-runtime", "actions.syncToRuntime")}
       ${actionButton("agent-sync-from-runtime", "actions.syncFromRuntime")}
       ${actionButton("agent-reset-matrix-state", "actions.resetMatrixState", "danger")}
@@ -3198,6 +3241,34 @@ async function saveTemplate(selectedId, template) {
   return api("/api/prompt-templates", { method: "POST", body: JSON.stringify(payload) });
 }
 
+async function publishAgent(agentId, { agent = null, mode = "keep", syncRuntime = true } = {}) {
+  const payload = { mode, sync_runtime: syncRuntime };
+  if (agent) payload.agent = cleanPayload(agent);
+  return api(`/api/agents/${encodeURIComponent(agentId || itemId(agent))}/publish`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+async function affectedAgentIds(kind, id) {
+  if (!id) return [];
+  const path =
+    kind === "prompt_templates"
+      ? `/api/prompt-templates/${encodeURIComponent(id)}/affected-agents`
+      : `/api/profiles/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/affected-agents`;
+  const result = await api(path);
+  return result.agent_ids || [];
+}
+
+async function publishAffectedAgents(kind, id, { mode = "keep" } = {}) {
+  const ids = await affectedAgentIds(kind, id);
+  const results = [];
+  for (const agentId of ids) {
+    results.push(await publishAgent(agentId, { mode }));
+  }
+  return results;
+}
+
 function nextId(prefix, items) {
   let index = items.length + 1;
   const ids = new Set(items.map(itemId));
@@ -3316,29 +3387,14 @@ async function handleAction(action) {
       if (error instanceof FormValidationError) return alertValidation(error);
       throw error;
     }
+    const data = new FormData(document.querySelector('[data-form="agent"]'));
+    const mode = String(data.get("template_apply_mode") || "keep");
+    if (mode === "overwrite" && !(await confirmDanger("confirm.overwriteWorkspace"))) return;
     return runAction(async () => {
-      await saveItem("agents", state.selectedAgentId, item);
+      await publishAgent(state.selectedAgentId || itemId(item), { agent: item, mode });
       state.selectedAgentId = itemId(item);
-    }, "messages.saved");
-  }
-  if (action === "agent-validate") {
-    const id = itemId(selectedAgent());
-    try {
-      setBusy(true);
-      clearToast();
-      state.validationResult = await api(`/api/agents/${encodeURIComponent(id)}/validate`, { method: "POST", body: "{}" });
-      if (state.validationResult.valid) {
-        showNotice(t("messages.validationPassed"));
-      } else {
-        showError(t("messages.validationFailed"));
-      }
-    } catch (error) {
-      showError(error.message || String(error));
-    } finally {
-      state.busy = false;
-      render();
-    }
-    return;
+      state.dashboardRequested = false;
+    }, "messages.published");
   }
   if (action === "agent-apply-template") {
     const agent = selectedAgent();
@@ -3400,9 +3456,13 @@ async function handleAction(action) {
       throw error;
     }
     return runAction(async () => {
+      const previousId = state[`selected${kind}Id`];
       await saveItem(kind, state[`selected${kind}Id`], item);
       state[`selected${kind}Id`] = itemId(item);
-    }, "messages.saved");
+      if (previousId && previousId !== itemId(item)) return;
+      await publishAffectedAgents(kind, previousId || itemId(item), { mode: "keep" });
+      state.dashboardRequested = false;
+    }, previousId && previousId !== itemId(item) ? "messages.saved" : "messages.savedAndPublished");
   }
   if (action === "llm-test-profile") {
     const form = document.querySelector('[data-form="llm"]');
@@ -3496,9 +3556,13 @@ async function handleAction(action) {
   if (action === "template-save") {
     const template = templateFromForm(document.querySelector('[data-form="template"]'));
     return runAction(async () => {
+      const previousId = state.selectedTemplateId;
       await saveTemplate(state.selectedTemplateId, template);
       state.selectedTemplateId = itemId(template);
-    }, "messages.saved");
+      if (previousId && previousId !== itemId(template)) return;
+      await publishAffectedAgents("prompt_templates", previousId || itemId(template), { mode: "keep" });
+      state.dashboardRequested = false;
+    }, previousId && previousId !== itemId(template) ? "messages.saved" : "messages.savedAndPublished");
   }
   if (action === "template-ai-fill-open") return openAiFillDialog();
   if (action === "template-ai-fill-close") {
@@ -3658,6 +3722,7 @@ async function handleResourceAction(actionText) {
   if (!resource.kind || !resource.name) return;
   const payload = { action: resource.action, kind: resource.kind, name: resource.name };
   if (resource.action === "delete") {
+    syncCurrentDraftFromForm();
     state.pendingResourceDelete = {
       kind: resource.kind,
       name: resource.name,

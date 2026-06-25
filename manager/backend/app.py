@@ -15,14 +15,14 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 try:
-    from config_store import ConfigError, ConfigStore, redact, to_json
+    from config_store import ConfigError, ConfigStore, item_id, redact, to_json
     from ai_fill import PromptTemplateAiFiller
     from docker_controller import DockerApiError, build_controller_from_env
     from llm_tester import LlmProfileTester
     from observability import agent_identifier, enrich_status, history_from_env, redact_lines, redact_text, utc_now
     from skill_store import SkillStore
 except ModuleNotFoundError:  # pragma: no cover - package import path for tests
-    from .config_store import ConfigError, ConfigStore, redact, to_json
+    from .config_store import ConfigError, ConfigStore, item_id, redact, to_json
     from .ai_fill import PromptTemplateAiFiller
     from .docker_controller import DockerApiError, build_controller_from_env
     from .llm_tester import LlmProfileTester
@@ -326,6 +326,12 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 success(self, 200, STORE.delete_item(kind, identifier))
                 return
 
+        if len(remaining) == 2 and remaining[1] == "affected-agents" and method == "GET":
+            identifier = remaining[0]
+            agent_ids = STORE.affected_agent_ids_for_item(kind, identifier)
+            success(self, 200, {"agent_ids": agent_ids})
+            return
+
         error_response(self, 405, "method_not_allowed", "Unsupported collection operation.", {"method": method})
 
     def route_skills(self, method: str, segments: list[str], query: dict[str, list[str]]) -> None:
@@ -502,8 +508,8 @@ class ManagerHandler(BaseHTTPRequestHandler):
         if len(segments) == 2:
             identifier, action = segments
             config = STORE.load()
-            agent = STORE.get_agent(identifier)
             if method == "GET" and action == "skills":
+                agent = STORE.get_agent(identifier)
                 success(self, 200, SKILLS.agent_skills(config, agent))
                 return
             if method == "POST" and action == "validate":
@@ -514,17 +520,25 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 HISTORY.append("apply-template", agent_id=identifier, result=result)
                 success(self, 200, result)
                 return
+            if method == "POST" and action == "publish":
+                result = STORE.publish_agent(identifier, self.read_optional_json(), DOCKER.sync_to_runtime)
+                HISTORY.append("publish", agent_id=item_id(result.get("agent") or {}) or identifier, result=result)
+                success(self, 200, result)
+                return
             if method == "POST" and action == "sync-to-runtime":
+                agent = STORE.get_agent(identifier)
                 result = DOCKER.sync_to_runtime(config, agent)
                 HISTORY.append("sync-to-runtime", agent_id=identifier, result=result)
                 success(self, 200, result)
                 return
             if method == "POST" and action == "sync-from-runtime":
+                agent = STORE.get_agent(identifier)
                 result = DOCKER.sync_from_runtime(config, agent)
                 HISTORY.append("sync-from-runtime", agent_id=identifier, result=result)
                 success(self, 200, result)
                 return
             if method == "POST" and action == "reset-matrix-state":
+                agent = STORE.get_agent(identifier)
                 reset_result = DOCKER.reset_matrix_state(config, agent)
                 rotate_result = STORE.rotate_matrix_device_id(identifier)
                 result = {"runtime": reset_result, "config": rotate_result}
@@ -539,6 +553,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 success(self, 200, result)
                 return
             if method == "POST" and action in {"start", "stop", "restart", "delete"}:
+                agent = STORE.get_agent(identifier)
                 result = getattr(DOCKER, action)(config, agent)
                 HISTORY.append(action, agent_id=identifier, result=result)
                 success(self, 202, result)
@@ -550,10 +565,12 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 success(self, 200, STORE.render_agent(identifier, formats=["zeroclaw_config_preview"]))
                 return
             if method == "GET" and action == "status":
+                agent = STORE.get_agent(identifier)
                 latest_export = HISTORY.latest_export_time(identifier)
                 success(self, 200, enrich_status(DOCKER.status(config, agent), latest_export_time=latest_export))
                 return
             if method == "GET" and action == "logs":
+                agent = STORE.get_agent(identifier)
                 tail = self.parse_tail(query)
                 logs = DOCKER.logs(config, agent, tail=tail)
                 logs["lines"] = redact_lines(logs.get("lines") or [], config)

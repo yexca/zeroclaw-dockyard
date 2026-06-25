@@ -139,6 +139,7 @@
     "duplicate": "复制",
     "edit": "编辑",
     "save": "保存",
+    "saveAndPublish": "保存并发布",
     "delete": "删除",
     "validate": "校验",
     "start": "启动",
@@ -310,6 +311,8 @@
   },
   "messages": {
     "saved": "已保存。",
+    "published": "已保存并发布。",
+    "savedAndPublished": "已保存并发布到受影响的 agent。",
     "deleted": "已删除。",
     "exported": "导出完成。",
     "templateApplied": "模板已应用。",

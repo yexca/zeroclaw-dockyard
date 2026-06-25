@@ -440,6 +440,46 @@ class ConfigStore:
         self.ensure_agents_stopped(config, [agent], "runtime_workspace_in_use")
         return self.renderer.initialize_workspace(config, agent, mode=mode)
 
+    def publish_agent(self, identifier: str, payload: Any | None, sync_runtime: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]] | None) -> dict[str, Any]:
+        mode = "keep"
+        agent_payload: Any | None = None
+        sync = True
+        if isinstance(payload, dict):
+            if isinstance(payload.get("mode"), str):
+                mode = payload["mode"]
+            if isinstance(payload.get("agent"), dict):
+                agent_payload = payload["agent"]
+            if payload.get("sync_runtime") is False:
+                sync = False
+
+        saved = None
+        target_id = identifier
+        if agent_payload is not None:
+            existing_ids = {str(item_id(agent) or "") for agent in self.list_agents()}
+            if identifier and identifier in existing_ids:
+                saved = self.update_agent(identifier, agent_payload)
+            else:
+                saved = self.create_item("agents", agent_payload)
+            target_id = str(item_id(saved) or target_id)
+
+        config = self.load()
+        agent = self.get_agent(target_id)
+        validation = self.validator.validate_agent(config, agent, check_ports=False)
+        if validation["errors"]:
+            raise ConfigError("validation_failed", "Agent configuration has validation errors.", validation, 422)
+
+        self.ensure_agents_stopped(config, [agent], "runtime_publish_in_use")
+        workspace = self.renderer.initialize_workspace(config, agent, mode=mode)
+        runtime = sync_runtime(config, agent) if sync and sync_runtime else None
+        return {
+            "agent": copy.deepcopy(agent),
+            "saved": saved,
+            "validation": validation,
+            "workspace": workspace,
+            "runtime": runtime,
+            "published": True,
+        }
+
     def rotate_matrix_device_id(self, identifier: str) -> dict[str, Any]:
         config = self.load()
         self.ensure_item_editable(config, "agents", identifier, None)
@@ -525,6 +565,10 @@ class ConfigStore:
         if not key:
             return []
         return [agent for agent in agents if agent.get(key) == identifier]
+
+    def affected_agent_ids_for_item(self, kind: str, identifier: str) -> list[str]:
+        config = self.load()
+        return [str(item_id(agent) or "") for agent in self.affected_agents_for_item(config, kind, identifier, None) if item_id(agent)]
 
     def collection_by_id(self, config: dict[str, Any], kind: str) -> dict[str, dict[str, Any]]:
         return {str(item_id(item) or ""): item for item in self._get_collection(config, kind) if item_id(item)}

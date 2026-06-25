@@ -181,6 +181,7 @@
     "duplicate": "Duplicate",
     "edit": "Edit",
     "save": "Save",
+    "saveAndPublish": "Save and publish",
     "delete": "Delete",
     "validate": "Validate",
     "start": "Start",
@@ -352,6 +353,8 @@
   },
   "messages": {
     "saved": "Saved.",
+    "published": "Saved and published.",
+    "savedAndPublished": "Saved and published to affected agents.",
     "deleted": "Deleted.",
     "exported": "Export complete.",
     "templateApplied": "Template applied.",
