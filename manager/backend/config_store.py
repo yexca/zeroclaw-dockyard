@@ -352,6 +352,32 @@ class ConfigStore:
         self._atomic_write_json(self.resource_decisions_path(), decisions)
         return decisions
 
+    def image_state_path(self) -> Path:
+        return self.generated_dir / "docker-image-state.json"
+
+    def load_image_state(self) -> dict[str, Any]:
+        path = self.image_state_path()
+        if not path.exists():
+            return {"acknowledged": {}}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {"acknowledged": {}}
+        acknowledged = raw.get("acknowledged") if isinstance(raw, dict) else {}
+        return {"acknowledged": acknowledged if isinstance(acknowledged, dict) else {}}
+
+    def acknowledge_image_risk(self, kind: str) -> dict[str, Any]:
+        if kind not in {"python", "root"}:
+            raise ConfigError("invalid_image_kind", "Unsupported image build kind.", {"kind": kind}, 422)
+        state = self.load_image_state()
+        acknowledged = state.setdefault("acknowledged", {})
+        acknowledged[kind] = {
+            "accepted": True,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._atomic_write_json(self.image_state_path(), state)
+        return state
+
     def apply_prompt_template(self, identifier: str, payload: Any | None = None) -> dict[str, Any]:
         mode = "keep"
         if isinstance(payload, dict) and isinstance(payload.get("mode"), str):

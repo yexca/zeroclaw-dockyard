@@ -25,6 +25,12 @@ browser -> manager -> docker-socket-proxy -> Docker daemon
 The proxy explicitly disables unrelated sections including `EXEC`, `SYSTEM`,
 `SWARM`, `SERVICES`, `SECRETS`, `BUILD`, and `AUTH`.
 
+`BUILD` stays disabled by default because Docker image builds execute Dockerfile
+commands through the host Docker daemon. Operators who want to use the WebUI
+image builder can copy `.env.example` to `.env`, set
+`DOCKER_SOCKET_PROXY_BUILD=1`, and restart Compose. The WebUI still asks for a
+one-time risk acknowledgement before building each advanced derived image type.
+
 `ALLOW_RESTARTS=1` also permits Docker's `kill` endpoint in the upstream proxy
 configuration. Manager code must not call `kill` unless a later safety review
 adds that behavior deliberately.

@@ -22,6 +22,8 @@ secret files are ignored by Git.
   operation history.
 - Agents: create, edit, validate, start, stop, restart, delete, export, and
   apply prompt templates.
+- Images: inspect local ZeroClaw images, pull the official image, and build
+  local Python or root-user variants after a one-time risk confirmation.
 - Profiles: edit reusable LLM, Vision LLM, Matrix, and MCP profiles.
 - Skills: edit runtime skill settings, skill bundles, canonical `SKILL.md`
   files, and support files.
@@ -154,6 +156,27 @@ which controls the generated Matrix peer group for that one agent. This field
 is required because ZeroClaw uses it to authorize inbound Matrix peers and
 `send_message_to_peer` outbound targets. Advanced agent settings include Docker
 image, prompt template apply mode, and explicit environment overrides.
+
+The Docker image field offers presets for the official image, the local Python
+support image, and the local root-user image when present. The text field
+remains editable for custom tags.
+
+## Images
+
+The Images view checks whether the official ZeroClaw image and local derived
+images exist. Pulling the official image uses the already enabled Docker image
+API.
+
+Building derived images is higher risk because Docker build executes Dockerfile
+steps through the Docker daemon. Socket proxy build access is disabled by
+default. To enable local builds, copy `.env.example` to `.env`, keep
+`DOCKER_SOCKET_PROXY_BUILD=1`, and restart Docker Compose.
+
+The Python support image installs `python3`, `python3-pip`, and `python3-venv`
+as root, then switches back to the base image user when Docker image metadata
+provides one. The root-user image leaves `USER root` for advanced operators.
+Each build action asks for risk confirmation once and records that local
+acknowledgement under `config/generated/`.
 
 Saving an agent stores its manager configuration. Applying its prompt template
 initializes the agent workspace by writing the selected prompt files. The

@@ -640,6 +640,22 @@ textarea {
   gap: 10px;
 }
 
+.agent-detail-panel pre {
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .data-list {
   display: grid;
   gap: 8px;

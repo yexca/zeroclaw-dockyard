@@ -16,6 +16,7 @@ from manager.backend.docker_controller import (
     MANAGER_LABEL,
     DockerApiController,
     FakeDockerController,
+    decode_build_stream,
     decode_docker_log_stream,
 )
 from manager.backend.observability import OperationHistory, normalize_agent_state, redact_lines
@@ -381,6 +382,38 @@ class DockerControllerTest(unittest.TestCase):
         self.assertEqual(result["legacy"], [])
         self.assertEqual(result["adopted"][0]["classification"], "adopted")
         self.assertEqual(result["ignored"][0]["classification"], "ignored")
+
+    def test_image_risk_acknowledgement_is_persisted(self) -> None:
+        root = Path(self.temp_dir.name)
+        store = ConfigStore(root / "manager.yaml", root / "manager.example.yaml", root / "generated")
+
+        result = store.acknowledge_image_risk("python")
+
+        self.assertTrue(result["acknowledged"]["python"]["accepted"])
+        self.assertTrue(store.load_image_state()["acknowledged"]["python"]["accepted"])
+
+    def test_python_dockerfile_installs_python_and_restores_base_user(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+
+        dockerfile = controller.derived_dockerfile("python", "example/zeroclaw:test", "1000:1000")
+
+        self.assertIn("USER root", dockerfile)
+        self.assertIn("python3 python3-pip python3-venv", dockerfile)
+        self.assertIn("USER 1000:1000", dockerfile)
+
+    def test_root_dockerfile_leaves_user_root(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+
+        dockerfile = controller.derived_dockerfile("root", "example/zeroclaw:test", "1000:1000")
+
+        self.assertIn("USER root", dockerfile)
+        self.assertNotIn("USER 1000:1000", dockerfile)
+
+    def test_decode_build_stream_reads_json_lines(self) -> None:
+        events = decode_build_stream(b'{"stream":"Step 1"}\n{"aux":{"ID":"sha256:abc"}}\n')
+
+        self.assertEqual(events[0]["stream"], "Step 1")
+        self.assertEqual(events[1]["aux"]["ID"], "sha256:abc")
 
     def test_delete_refuses_expected_resource(self) -> None:
         controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))

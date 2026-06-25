@@ -299,7 +299,7 @@ Update this file as you evolve. Your identity is yours to shape.
 (Track unfinished tasks and follow-ups here)
 `
 };
-const TABS = ["dashboard", "agents", "llm", "vision", "matrix", "mcp", "skills", "prompts", "export", "resources"];
+const TABS = ["dashboard", "agents", "llm", "vision", "matrix", "mcp", "skills", "prompts", "images", "resources", "export"];
 const DEFAULT_TAB = "agents";
 const SECRET_KEYS = ["api_key", "token", "password", "recovery_key", "secret"];
 const LLM_PRESETS = {
@@ -406,6 +406,9 @@ const state = {
   dockerResources: null,
   dockerResourcesRequested: false,
   dockerResourcesLoading: false,
+  dockerImages: null,
+  dockerImagesRequested: false,
+  dockerImagesLoading: false,
   agentStatuses: {},
   agentLogs: {},
   logTail: 200,
@@ -895,6 +898,10 @@ async function refreshDockerResources() {
   state.dockerResources = await api("/api/docker/resources");
 }
 
+async function refreshDockerImages() {
+  state.dockerImages = await api("/api/docker/images");
+}
+
 function removeAgentLocalState(agentId) {
   state.config.agents = collection("agents").filter((agent) => itemId(agent) !== agentId);
   delete state.agentStatuses[agentId];
@@ -935,6 +942,23 @@ async function refreshDockerResourcesInBackground() {
   } finally {
     state.dockerResourcesLoading = false;
     if (visible || state.selectedTab === "resources") render();
+  }
+}
+
+async function refreshDockerImagesInBackground() {
+  state.dockerImagesRequested = true;
+  const visible = state.selectedTab === "images";
+  state.dockerImagesLoading = visible;
+  if (visible) render();
+  try {
+    await refreshDockerImages();
+    clearToast("error");
+  } catch (error) {
+    state.dockerImagesRequested = false;
+    if (visible) showError(error.message || String(error));
+  } finally {
+    state.dockerImagesLoading = false;
+    if (visible || state.selectedTab === "images") render();
   }
 }
 
@@ -1450,6 +1474,7 @@ function renderNotices() {
   const loading =
     state.busy ||
     (state.selectedTab === "dashboard" && state.dashboardLoading) ||
+    (state.selectedTab === "images" && state.dockerImagesLoading) ||
     (state.selectedTab === "resources" && state.dockerResourcesLoading)
       ? renderNotice("muted", t("common.loading"), "status")
       : "";
@@ -1473,6 +1498,7 @@ function renderNotice(kind, message, role) {
 function renderSelectedTab() {
   if (!state.config) return `<div class="empty-state">${escapeHtml(t("common.loading"))}</div>`;
   if (state.selectedTab === "dashboard") return renderDashboard();
+  if (state.selectedTab === "images") return renderDockerImages();
   if (state.selectedTab === "resources") return renderDockerResources();
   if (state.selectedTab === "agents") return renderAgentEditor();
   if (state.selectedTab === "llm") return renderProfileManager("llm");
@@ -1521,6 +1547,66 @@ function renderDockerResources() {
     ${renderResourceGroup("resources.volumes", audit?.volumes, "volume")}
     ${renderResourceGroup("resources.networks", audit?.networks, "network")}
   `;
+}
+
+function renderDockerImages() {
+  const inventory = state.dockerImages;
+  const images = inventory?.images || [];
+  const recommended = inventory?.recommended || { official: DEFAULT_ZEROCLAW_IMAGE, python: "zeroclaw-python:v0.8.1-debian", root: "zeroclaw-root:v0.8.1-debian" };
+  return `
+    <header class="section-header">
+      <div><h2>${escapeHtml(t("images.title"))}</h2><p>${escapeHtml(t("images.subtitle"))}</p></div>
+      <div class="button-row">
+        ${actionButton("refresh-docker-images", "actions.refreshStatus")}
+      </div>
+    </header>
+    <section class="form-section">
+      <div class="button-row">
+        ${actionButton("image-pull-official", "actions.pullOfficial")}
+        ${actionButton("image-build-python", "actions.buildPythonImage")}
+        ${actionButton("image-build-root", "actions.buildRootImage", "danger")}
+      </div>
+      <p class="muted-text">${escapeHtml(t("images.buildHint"))}</p>
+    </section>
+    <div class="resource-summary">
+      ${renderImageMetric(t("images.official"), recommended.official, imageByReference(images, recommended.official))}
+      ${renderImageMetric(t("images.python"), recommended.python, imageByReference(images, recommended.python))}
+      ${renderImageMetric(t("images.root"), recommended.root, imageByReference(images, recommended.root))}
+    </div>
+    <section class="resource-group">
+      <h3>${escapeHtml(t("images.localImages"))}</h3>
+      <div class="resource-list">
+        ${images.length ? images.map(renderImageRow).join("") : `<div class="empty-state">${escapeHtml(t("common.empty"))}</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function imageByReference(images, reference) {
+  return images.find((image) => image.reference === reference);
+}
+
+function renderImageMetric(label, reference, image) {
+  return `<div class="metric">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(image?.present ? t("images.present") : t("images.missing"))}</strong>
+    <small>${escapeHtml(reference || "")}</small>
+  </div>`;
+}
+
+function renderImageRow(image) {
+  return `<article class="resource-row">
+    <div>
+      <strong>${escapeHtml(image.reference || t("common.unnamed"))}</strong>
+      <span>${escapeHtml(t(`imageKinds.${image.kind}`) || image.kind || "custom")}</span>
+    </div>
+    <div>${renderDetail(t("images.present"), image.present ? t("common.yes") : t("common.no"))}${renderDetail(t("images.shortId"), image.short_id || "")}</div>
+    <div>${renderDetail(t("images.user"), image.user || "")}${renderDetail(t("images.size"), formatBytes(image.size))}</div>
+    <details class="agent-detail-panel">
+      <summary>${escapeHtml(t("resources.labels"))}</summary>
+      <pre>${escapeHtml(JSON.stringify({ repo_tags: image.repo_tags || [], labels: image.labels || {}, error: image.error || null }, null, 2))}</pre>
+    </details>
+  </article>`;
 }
 
 function renderResourceSummaryMetric(labelKey, group) {
@@ -1839,6 +1925,19 @@ function displayValue(value) {
   return value === undefined || value === null || value === "" ? t("common.none") : value;
 }
 
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) return t("common.none");
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
 function renderHistory() {
   const history = state.dashboard?.history || [];
   return `<section class="history-panel">
@@ -1972,7 +2071,8 @@ function renderAgentAdvancedFields(agent) {
   return `<details class="form-section">
     <summary>${escapeHtml(t("fields.advanced"))}</summary>
     <div class="form-grid">
-      ${field("fields.dockerImage", "image", agent.image || DEFAULT_ZEROCLAW_IMAGE, "", "fieldHelp.agent.image")}
+      ${selectField("fields.imagePreset", "image_preset", imageOptions(agent.image || DEFAULT_ZEROCLAW_IMAGE), 'data-image-preset', "fieldHelp.agent.image")}
+      ${field("fields.dockerImage", "image", agent.image || DEFAULT_ZEROCLAW_IMAGE, 'data-image-input', "fieldHelp.agent.image")}
       ${selectField(
         "fields.templateApplyMode",
         "template_apply_mode",
@@ -1990,6 +2090,24 @@ function renderAgentAdvancedFields(agent) {
       ${textareaField("fields.environment", "environment", JSON.stringify(agent.environment || {}, null, 2), "", "fieldHelp.agent.environment")}
     </div>
   </details>`;
+}
+
+function imageOptions(selected) {
+  const inventory = state.dockerImages;
+  const recommended = inventory?.recommended || { official: DEFAULT_ZEROCLAW_IMAGE, python: "zeroclaw-python:v0.8.1-debian", root: "zeroclaw-root:v0.8.1-debian" };
+  const rows = [
+    [recommended.official, t("images.official")],
+    [recommended.python, t("images.python")],
+    [recommended.root, t("images.root")]
+  ];
+  for (const image of inventory?.images || []) {
+    if (image.reference && !rows.some(([value]) => value === image.reference)) rows.push([image.reference, image.reference]);
+  }
+  if (selected && !rows.some(([value]) => value === selected)) rows.push([selected, selected]);
+  rows.push(["__custom__", t("images.custom")]);
+  return rows
+    .map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(label)} (${escapeHtml(value)})</option>`)
+    .join("");
 }
 
 function renderAgentProactiveFields(agent) {
@@ -2996,6 +3114,30 @@ async function confirmDanger(messageKey) {
   return confirmDialog(t(messageKey));
 }
 
+async function runImageAction(action, successKey, extra = {}) {
+  return runAction(async () => {
+    const result = await api("/api/docker/images/action", {
+      method: "POST",
+      body: JSON.stringify({ action, ...extra })
+    });
+    await refreshDockerImages();
+    return result;
+  }, successKey);
+}
+
+async function buildManagedImage(kind) {
+  if (!state.dockerImages) await refreshDockerImages();
+  const acknowledged = state.dockerImages?.state?.acknowledged?.[kind]?.accepted === true;
+  if (!acknowledged && !(await confirmDanger(kind === "python" ? "confirm.buildPythonImage" : "confirm.buildRootImage"))) return;
+  const recommended = state.dockerImages?.recommended || {};
+  const target = kind === "python" ? recommended.python : recommended.root;
+  return runImageAction(`build-${kind}`, "messages.imageActionDone", {
+    base_image: recommended.official || DEFAULT_ZEROCLAW_IMAGE,
+    target_image: target,
+    acknowledge_risk: true
+  });
+}
+
 async function handleAction(action) {
   if (action.startsWith("agent-start:")) return controlAgent(action.split(":")[1], "start");
   if (action.startsWith("agent-stop:")) return controlAgent(action.split(":")[1], "stop");
@@ -3027,6 +3169,18 @@ async function handleAction(action) {
   }
   if (action === "refresh-docker-resources") {
     return runAction(refreshDockerResources);
+  }
+  if (action === "refresh-docker-images") {
+    return runAction(refreshDockerImages);
+  }
+  if (action === "image-pull-official") {
+    return runImageAction("pull-official", "messages.imageActionDone");
+  }
+  if (action === "image-build-python") {
+    return buildManagedImage("python");
+  }
+  if (action === "image-build-root") {
+    return buildManagedImage("root");
   }
   if (action === "resource-delete-cancel") {
     state.pendingResourceDelete = null;
@@ -3786,6 +3940,9 @@ function bindEvents() {
       if (tab === "dashboard" && !state.dashboardRequested) {
         await refreshDashboardInBackground();
       }
+      if (tab === "images" && !state.dockerImagesRequested) {
+        await refreshDockerImagesInBackground();
+      }
       if (tab === "resources" && !state.dockerResourcesRequested) {
         await refreshDockerResourcesInBackground();
       }
@@ -3903,6 +4060,10 @@ function bindEvents() {
     if (event.target.matches("[data-resource-delete-input]")) {
       state.pendingResourceDeleteInput = event.target.value;
       render();
+    }
+    if (event.target.matches("[data-image-preset]")) {
+      const input = document.querySelector("[data-image-input]");
+      if (input && event.target.value !== "__custom__") input.value = event.target.value;
     }
   });
 
@@ -4037,10 +4198,13 @@ async function main() {
   }).catch(() => {});
   if (state.selectedTab === "dashboard") {
     refreshDashboardInBackground();
+  } else if (state.selectedTab === "images") {
+    refreshDockerImagesInBackground();
   } else if (state.selectedTab === "resources") {
     refreshDockerResourcesInBackground();
   } else {
     window.setTimeout(() => refreshDashboardInBackground(), 250);
+    window.setTimeout(() => refreshDockerImagesInBackground(), 500);
   }
 }
 

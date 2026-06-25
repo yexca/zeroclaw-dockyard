@@ -23,6 +23,7 @@
     "label": "Management sections",
     "dashboard": "Dashboard",
     "agents": "Agents",
+    "images": "Images",
     "llm": "LLM Profiles",
     "vision": "Vision LLM Profiles",
     "matrix": "Matrix Profiles",
@@ -31,6 +32,21 @@
     "prompts": "Prompt Templates",
     "export": "Export",
     "resources": "Docker Resources"
+  },
+  "images": {
+    "title": "Images",
+    "subtitle": "Inspect ZeroClaw runtime images, pull the official image, and build local advanced variants.",
+    "official": "Official ZeroClaw",
+    "python": "Python support",
+    "root": "Root user",
+    "custom": "Custom",
+    "localImages": "Local image references",
+    "present": "Present",
+    "missing": "Missing",
+    "shortId": "Image ID",
+    "user": "User",
+    "size": "Size",
+    "buildHint": "Building images requires Docker socket proxy BUILD access. Copy .env.example to .env, keep DOCKER_SOCKET_PROXY_BUILD=1, then restart docker compose before building."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -173,6 +189,9 @@
     "logs": "Logs",
     "downloadLogs": "Download logs",
     "refreshStatus": "Refresh status",
+    "pullOfficial": "Pull official image",
+    "buildPythonImage": "Build Python image",
+    "buildRootImage": "Build root image",
     "applyTemplate": "Apply template",
     "export": "Export",
     "aiFill": "AI fill",
@@ -205,6 +224,7 @@
     "hostPort": "Host port",
     "image": "Image",
     "dockerImage": "Docker image",
+    "imagePreset": "Image preset",
     "enabled": "Enabled",
     "llmProfile": "LLM profile",
     "visionProfile": "Vision LLM profile",
@@ -336,6 +356,7 @@
     "syncedFromRuntime": "Runtime volume synced back to local files.",
     "resetMatrixState": "Matrix E2EE state reset and device ID rotated.",
     "resourceActionDone": "Docker resource action complete.",
+    "imageActionDone": "Docker image action complete.",
     "resetMatrixRunning": "Agent container is running. Stop it before resetting Matrix state.",
     "started": "Start requested.",
     "stopped": "Stop requested.",
@@ -370,6 +391,8 @@
     "deleteSkillBundle": "Delete this skill bundle config? Skill files on disk are not removed.",
     "archiveSkill": "Archive this skill into shared/skills/_deleted?",
     "deleteSkillFile": "Delete this support file?"
+    ,"buildPythonImage": "This will build a local ZeroClaw image with Python installed. Docker build can execute commands as root through the Docker daemon. Continue?",
+    "buildRootImage": "This will build a local ZeroClaw image that runs as root. Root containers can write files as root and increase runtime risk. Continue?"
   },
   "common": {
     "loading": "Loading...",
@@ -534,6 +557,13 @@
     "container": "Container",
     "volume": "Volume",
     "network": "Network"
+  },
+  "imageKinds": {
+    "official": "Official",
+    "python": "Python",
+    "root": "Root",
+    "agent": "Agent image",
+    "custom": "Custom"
   },
   "resourceRoles": {
     "agent": "Agent",

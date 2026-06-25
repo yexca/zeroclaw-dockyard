@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
 import shutil
+import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -30,9 +32,13 @@ AGENT_NAME_LABEL = "zeroclaw.agent.name"
 SPEC_HASH_LABEL = "zeroclaw.agent.spec_hash"
 ROLE_LABEL = "zeroclaw.role"
 DEFAULT_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian"
+DEFAULT_PYTHON_IMAGE = "zeroclaw-python:v0.8.1-debian"
+DEFAULT_ROOT_IMAGE = "zeroclaw-root:v0.8.1-debian"
 DEFAULT_PROACTIVE_IMAGE = "python:3.12-alpine"
 SYNC_HELPER_IMAGE = "python:3.12-alpine"
 CONTAINER_PORT = "42617/tcp"
+MANAGED_IMAGE_LABEL = "zeroclaw.image.managed"
+IMAGE_KIND_LABEL = "zeroclaw.image.kind"
 
 
 class DockerController(Protocol):
@@ -67,6 +73,12 @@ class DockerController(Protocol):
         ...
 
     def resource_action(self, config: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    def image_inventory(self, config: dict[str, Any], state: dict[str, Any] | None = None) -> dict[str, Any]:
+        ...
+
+    def image_action(self, config: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         ...
 
 
@@ -120,6 +132,43 @@ class DockerApiClient:
                 message = decoded.get("message") or body
             except json.JSONDecodeError:
                 message = body or exc.reason
+            raise DockerApiError(exc.code, str(message), details) from exc
+        except URLError as exc:
+            raise DockerApiError(503, "Unable to reach Docker API proxy.", {"reason": str(exc.reason)}) from exc
+
+    def request_bytes(
+        self,
+        method: str,
+        path: str,
+        body: bytes,
+        headers: dict[str, str] | None = None,
+        query: dict[str, Any] | None = None,
+        raw: bool = False,
+    ) -> Any:
+        url = urljoin(self.base_url, path.lstrip("/"))
+        if query:
+            url = f"{url}?{urlencode(query, doseq=True)}"
+        request = Request(url, data=body, headers=headers or {}, method=method)
+        try:
+            with urlopen(request, timeout=self.timeout_secs) as response:
+                response_body = response.read()
+                if raw:
+                    return response_body
+                if not response_body:
+                    return {}
+                content_type = response.headers.get("Content-Type", "")
+                if "json" in content_type:
+                    return json.loads(response_body.decode("utf-8"))
+                return response_body.decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            body_text = exc.read().decode("utf-8", errors="replace")
+            details: dict[str, Any] = {"status": exc.code, "body": body_text}
+            try:
+                decoded = json.loads(body_text)
+                details["body"] = decoded
+                message = decoded.get("message") or body_text
+            except json.JSONDecodeError:
+                message = body_text or exc.reason
             raise DockerApiError(exc.code, str(message), details) from exc
         except URLError as exc:
             raise DockerApiError(503, "Unable to reach Docker API proxy.", {"reason": str(exc.reason)}) from exc
@@ -461,6 +510,62 @@ class DockerApiController:
         if kind != "volume":
             raise ConfigError("unsupported_migration", "Only volume migration is currently supported.", {"kind": kind}, 422)
         return self.migrate_volume(name, target_name)
+
+    def image_inventory(self, config: dict[str, Any], state: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.configure_client(config)
+        defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
+        official = str(defaults.get("zeroclaw_image") or os.getenv("ZEROCLAW_IMAGE") or DEFAULT_IMAGE)
+        references: list[tuple[str, str]] = [
+            ("official", official),
+            ("python", DEFAULT_PYTHON_IMAGE),
+            ("root", DEFAULT_ROOT_IMAGE),
+        ]
+        agents = config.get("agents") if isinstance(config.get("agents"), list) else []
+        for agent in agents:
+            if isinstance(agent, dict) and agent.get("image"):
+                references.append(("agent", str(agent.get("image"))))
+        seen: set[str] = set()
+        images: list[dict[str, Any]] = []
+        for kind, reference in references:
+            if not reference or reference in seen:
+                continue
+            seen.add(reference)
+            images.append(self.image_summary(reference, kind))
+        return {
+            "checked_at": self._now(),
+            "default_image": official,
+            "recommended": {
+                "official": official,
+                "python": DEFAULT_PYTHON_IMAGE,
+                "root": DEFAULT_ROOT_IMAGE,
+            },
+            "build_enabled_hint": "Set DOCKER_SOCKET_PROXY_BUILD=1 in .env and restart docker compose to enable builds.",
+            "state": state or {"acknowledged": {}},
+            "images": images,
+            "controller": "docker-api",
+        }
+
+    def image_action(self, config: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        self.configure_client(config)
+        action = str(payload.get("action") or "")
+        if action == "pull-official":
+            defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
+            image = str(payload.get("image") or defaults.get("zeroclaw_image") or os.getenv("ZEROCLAW_IMAGE") or DEFAULT_IMAGE)
+            self.pull_image(image)
+            return {"action": action, "image": image, "summary": self.image_summary(image, "official"), "timestamp": self._now()}
+        if action == "build-python":
+            return self.build_derived_image(
+                kind="python",
+                base_image=str(payload.get("base_image") or DEFAULT_IMAGE),
+                target_image=str(payload.get("target_image") or DEFAULT_PYTHON_IMAGE),
+            )
+        if action == "build-root":
+            return self.build_derived_image(
+                kind="root",
+                base_image=str(payload.get("base_image") or DEFAULT_IMAGE),
+                target_image=str(payload.get("target_image") or DEFAULT_ROOT_IMAGE),
+            )
+        raise ConfigError("invalid_image_action", "Unsupported Docker image action.", {"action": action}, 422)
 
     def reconcile_proactive_container(self, config: dict[str, Any], agent: dict[str, Any], agent_spec: "ContainerSpec") -> list[str]:
         proactive_spec = self.build_proactive_spec(config, agent, agent_spec=agent_spec)
@@ -1177,6 +1282,122 @@ else:
             },
         )
 
+    def image_summary(self, reference: str, kind: str = "custom") -> dict[str, Any]:
+        row: dict[str, Any] = {
+            "reference": reference,
+            "kind": kind,
+            "present": False,
+        }
+        try:
+            image = self.inspect_image(reference)
+        except DockerApiError as exc:
+            if exc.status == 404:
+                return row
+            row["error"] = {"status": exc.status, "message": exc.message}
+            return row
+        config = image.get("Config") if isinstance(image.get("Config"), dict) else {}
+        labels = config.get("Labels") if isinstance(config.get("Labels"), dict) else {}
+        repo_tags = image.get("RepoTags") if isinstance(image.get("RepoTags"), list) else []
+        row.update(
+            {
+                "present": True,
+                "id": image.get("Id"),
+                "short_id": short_image_id(str(image.get("Id") or "")),
+                "repo_tags": repo_tags,
+                "created": image.get("Created"),
+                "size": image.get("Size"),
+                "user": config.get("User") or "",
+                "labels": labels,
+            }
+        )
+        return row
+
+    def inspect_image(self, reference: str) -> dict[str, Any]:
+        return self.client.request("GET", f"/images/{quote(reference, safe='')}/json")
+
+    def build_derived_image(self, kind: str, base_image: str, target_image: str) -> dict[str, Any]:
+        if kind not in {"python", "root"}:
+            raise ConfigError("invalid_image_kind", "Unsupported image build kind.", {"kind": kind}, 422)
+        if not target_image or any(char.isspace() for char in target_image):
+            raise ConfigError("invalid_image_tag", "Target image tag must not be empty or contain whitespace.", {"target_image": target_image}, 422)
+        self.pull_image(base_image)
+        base_user = ""
+        try:
+            base = self.inspect_image(base_image)
+            config = base.get("Config") if isinstance(base.get("Config"), dict) else {}
+            base_user = str(config.get("User") or "")
+        except DockerApiError:
+            base_user = ""
+        dockerfile = self.derived_dockerfile(kind, base_image, base_user)
+        context = self.build_context_tar(dockerfile)
+        query = {
+            "t": target_image,
+            "labels": json.dumps(
+                {
+                    MANAGED_IMAGE_LABEL: "true",
+                    IMAGE_KIND_LABEL: kind,
+                    "zeroclaw.image.base": base_image,
+                },
+                sort_keys=True,
+            ),
+        }
+        raw = self.client.request_bytes(
+            "POST",
+            "/build",
+            context,
+            headers={"Content-Type": "application/x-tar"},
+            query=query,
+            raw=True,
+        )
+        events = decode_build_stream(raw)
+        errors = [event for event in events if event.get("error") or event.get("errorDetail")]
+        if errors:
+            message = str(errors[-1].get("error") or (errors[-1].get("errorDetail") or {}).get("message") or "Docker image build failed.")
+            raise ConfigError("image_build_failed", message, {"events": events[-20:]}, 502)
+        return {
+            "action": f"build-{kind}",
+            "base_image": base_image,
+            "target_image": target_image,
+            "base_user": base_user,
+            "events": events[-50:],
+            "summary": self.image_summary(target_image, kind),
+            "timestamp": self._now(),
+        }
+
+    def derived_dockerfile(self, kind: str, base_image: str, base_user: str) -> str:
+        if kind == "root":
+            return "\n".join(
+                [
+                    f"FROM {base_image}",
+                    "USER root",
+                    'LABEL zeroclaw.image.managed="true" zeroclaw.image.kind="root"',
+                    "",
+                ]
+            )
+        final_user = base_user.strip() or "zeroclaw"
+        return "\n".join(
+            [
+                f"FROM {base_image}",
+                "USER root",
+                "RUN apt-get update \\",
+                "    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \\",
+                "    && rm -rf /var/lib/apt/lists/*",
+                f"USER {final_user}",
+                'LABEL zeroclaw.image.managed="true" zeroclaw.image.kind="python"',
+                "",
+            ]
+        )
+
+    def build_context_tar(self, dockerfile: str) -> bytes:
+        buffer = io.BytesIO()
+        encoded = dockerfile.encode("utf-8")
+        with tarfile.open(fileobj=buffer, mode="w") as archive:
+            info = tarfile.TarInfo("Dockerfile")
+            info.size = len(encoded)
+            info.mtime = int(datetime.now(timezone.utc).timestamp())
+            archive.addfile(info, io.BytesIO(encoded))
+        return buffer.getvalue()
+
     def pull_image(self, image: str) -> None:
         query = {"fromImage": image}
         if ":" in image.rsplit("/", 1)[-1]:
@@ -1331,6 +1552,25 @@ class FakeDockerController:
     def resource_action(self, config: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         return {"action": payload.get("action"), "kind": payload.get("kind"), "name": payload.get("name"), "controller": "fake", "timestamp": self._now()}
 
+    def image_inventory(self, config: dict[str, Any], state: dict[str, Any] | None = None) -> dict[str, Any]:
+        defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
+        official = str(defaults.get("zeroclaw_image") or DEFAULT_IMAGE)
+        return {
+            "checked_at": self._now(),
+            "default_image": official,
+            "recommended": {"official": official, "python": DEFAULT_PYTHON_IMAGE, "root": DEFAULT_ROOT_IMAGE},
+            "state": state or {"acknowledged": {}},
+            "images": [
+                {"reference": official, "kind": "official", "present": False},
+                {"reference": DEFAULT_PYTHON_IMAGE, "kind": "python", "present": False},
+                {"reference": DEFAULT_ROOT_IMAGE, "kind": "root", "present": False},
+            ],
+            "controller": "fake",
+        }
+
+    def image_action(self, config: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        return {"action": payload.get("action"), "controller": "fake", "timestamp": self._now()}
+
     def _operation(self, operation: str, agent: dict[str, Any], state: str) -> dict[str, Any]:
         return {
             "agent_id": self._agent_id(agent),
@@ -1437,3 +1677,22 @@ def decode_docker_log_stream(body: bytes) -> str:
     if frames and index == len(body):
         return b"".join(frames).decode("utf-8", errors="replace")
     return body.decode("utf-8", errors="replace")
+
+
+def decode_build_stream(body: bytes) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for line in body.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            event = {"stream": line}
+        if isinstance(event, dict):
+            events.append(event)
+    return events
+
+
+def short_image_id(image_id: str) -> str:
+    value = image_id.removeprefix("sha256:")
+    return value[:12] if value else ""

@@ -193,6 +193,30 @@ class ManagerHandler(BaseHTTPRequestHandler):
             success(self, 200, DOCKER.audit_resources(STORE.load(), STORE.load_resource_decisions()))
             return
 
+        if method == "GET" and path == "/api/docker/images":
+            success(self, 200, DOCKER.image_inventory(STORE.load(), STORE.load_image_state()))
+            return
+
+        if method == "POST" and path == "/api/docker/images/action":
+            payload = self.read_json()
+            if not isinstance(payload, dict):
+                error_response(self, 400, "invalid_payload", "Image action payload must be an object.")
+                return
+            action = str(payload.get("action") or "")
+            if action in {"build-python", "build-root"}:
+                kind = "python" if action == "build-python" else "root"
+                if payload.get("acknowledge_risk") is not True:
+                    state = STORE.load_image_state()
+                    acknowledged = state.get("acknowledged") if isinstance(state.get("acknowledged"), dict) else {}
+                    accepted = acknowledged.get(kind) if isinstance(acknowledged, dict) else {}
+                    if not (isinstance(accepted, dict) and accepted.get("accepted") is True):
+                        raise ConfigError("image_risk_ack_required", "Risk acknowledgement is required before building this image.", {"kind": kind}, 409)
+                STORE.acknowledge_image_risk(kind)
+            result = DOCKER.image_action(STORE.load(), payload)
+            HISTORY.append(f"docker-image-{action}", result=result)
+            success(self, 200, result)
+            return
+
         if method == "POST" and path == "/api/docker/resources/action":
             payload = self.read_json()
             if not isinstance(payload, dict):

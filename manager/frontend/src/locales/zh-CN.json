@@ -29,8 +29,24 @@
     "prompts": "提示词模板",
     "export": "导出",
     "vision": "Vision LLM 配置",
+    "images": "镜像管理",
     "resources": "Docker 资源",
     "skills": "技能"
+  },
+  "images": {
+    "title": "镜像管理",
+    "subtitle": "检查 ZeroClaw 运行镜像，拉取官方镜像，并构建本地高级变体。",
+    "official": "官方 ZeroClaw",
+    "python": "Python 支持",
+    "root": "Root 用户",
+    "custom": "自定义",
+    "localImages": "本地镜像引用",
+    "present": "已存在",
+    "missing": "缺失",
+    "shortId": "镜像 ID",
+    "user": "用户",
+    "size": "大小",
+    "buildHint": "构建镜像需要 Docker socket proxy 的 BUILD 权限。复制 .env.example 为 .env，保留 DOCKER_SOCKET_PROXY_BUILD=1，然后重启 docker compose。"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -131,6 +147,9 @@
     "logs": "日志",
     "downloadLogs": "下载日志",
     "refreshStatus": "刷新状态",
+    "pullOfficial": "拉取官方镜像",
+    "buildPythonImage": "构建 Python 镜像",
+    "buildRootImage": "构建 Root 镜像",
     "applyTemplate": "应用模板",
     "export": "导出",
     "aiFill": "AI 填写",
@@ -163,6 +182,7 @@
     "hostPort": "主机端口",
     "image": "镜像",
     "dockerImage": "Docker 镜像",
+    "imagePreset": "镜像预设",
     "enabled": "启用",
     "llmProfile": "LLM 配置",
     "matrixProfile": "Matrix 配置",
@@ -294,6 +314,7 @@
     "syncedFromRuntime": "运行卷已同步回本地文件。",
     "resetMatrixState": "Matrix E2EE 状态已重置，device_id 已更新。",
     "resourceActionDone": "Docker 资源操作已完成。",
+    "imageActionDone": "Docker 镜像操作已完成。",
     "resetMatrixRunning": "当前容器正在运行，请关闭后再试。",
     "started": "已请求启动。",
     "stopped": "已请求停止。",
@@ -327,7 +348,9 @@
     "deleteTemplateFile": "移除这个自定义模板文件？",
     "deleteSkillBundle": "删除这个技能包配置？磁盘上的技能文件不会被删除。",
     "archiveSkill": "将这个技能归档到 shared/skills/_deleted 吗？",
-    "deleteSkillFile": "删除这个支持文件吗？"
+    "deleteSkillFile": "删除这个支持文件吗？",
+    "buildPythonImage": "这会构建一个安装 Python 的本地 ZeroClaw 镜像。Docker build 可以通过 Docker daemon 以 root 执行命令。是否继续？",
+    "buildRootImage": "这会构建一个以 root 运行的本地 ZeroClaw 镜像。Root 容器可能以 root 写入文件并提高运行风险。是否继续？"
   },
   "common": {
     "loading": "加载中...",
@@ -497,6 +520,13 @@
     "container": "容器",
     "volume": "卷",
     "network": "网络"
+  },
+  "imageKinds": {
+    "official": "官方",
+    "python": "Python",
+    "root": "Root",
+    "agent": "Agent 镜像",
+    "custom": "自定义"
   },
   "resourceRoles": {
     "agent": "Agent",

@@ -97,6 +97,15 @@ inside the project `shared/` directory. Deleting a skill archives it under
 - `GET /api/dashboard`
 - `GET /api/history`
 
+## Docker Images
+
+- `GET /api/docker/images`
+- `POST /api/docker/images/action`
+
+Image actions include `pull-official`, `build-python`, and `build-root`.
+Build actions require a one-time risk acknowledgement and Docker socket proxy
+`BUILD` access.
+
 Dashboard status may call Docker through the socket proxy. The frontend loads
 configuration first and refreshes dashboard status in the background or when
 the Dashboard view is opened.
