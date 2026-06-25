@@ -3455,14 +3455,15 @@ async function handleAction(action) {
       if (error instanceof FormValidationError) return alertValidation(error);
       throw error;
     }
+    const previousId = state[`selected${kind}Id`];
+    const idChanged = previousId && previousId !== itemId(item);
     return runAction(async () => {
-      const previousId = state[`selected${kind}Id`];
       await saveItem(kind, state[`selected${kind}Id`], item);
       state[`selected${kind}Id`] = itemId(item);
-      if (previousId && previousId !== itemId(item)) return;
+      if (idChanged) return;
       await publishAffectedAgents(kind, previousId || itemId(item), { mode: "keep" });
       state.dashboardRequested = false;
-    }, previousId && previousId !== itemId(item) ? "messages.saved" : "messages.savedAndPublished");
+    }, idChanged ? "messages.saved" : "messages.savedAndPublished");
   }
   if (action === "llm-test-profile") {
     const form = document.querySelector('[data-form="llm"]');
@@ -3555,14 +3556,15 @@ async function handleAction(action) {
   }
   if (action === "template-save") {
     const template = templateFromForm(document.querySelector('[data-form="template"]'));
+    const previousId = state.selectedTemplateId;
+    const idChanged = previousId && previousId !== itemId(template);
     return runAction(async () => {
-      const previousId = state.selectedTemplateId;
       await saveTemplate(state.selectedTemplateId, template);
       state.selectedTemplateId = itemId(template);
-      if (previousId && previousId !== itemId(template)) return;
+      if (idChanged) return;
       await publishAffectedAgents("prompt_templates", previousId || itemId(template), { mode: "keep" });
       state.dashboardRequested = false;
-    }, previousId && previousId !== itemId(template) ? "messages.saved" : "messages.savedAndPublished");
+    }, idChanged ? "messages.saved" : "messages.savedAndPublished");
   }
   if (action === "template-ai-fill-open") return openAiFillDialog();
   if (action === "template-ai-fill-close") {
