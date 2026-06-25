@@ -33,6 +33,14 @@ Errors use:
 - `POST /api/profiles/{llm|matrix|mcp}`
 - `PUT /api/profiles/{llm|matrix|mcp}/{id}`
 - `DELETE /api/profiles/{llm|matrix|mcp}/{id}`
+- `POST /api/profiles/llm/test`
+- `POST /api/profiles/llm/{id}/test`
+
+`POST /api/profiles/llm/test` tests a draft LLM profile from the request body:
+`{"profile": {...}}`. `POST /api/profiles/llm/{id}/test` tests a saved LLM
+profile. Both endpoints send a minimal provider request for
+`chat_completions` or `responses`, return model, status, latency, and a short
+preview on success, and omit credentials from error details.
 
 ## Prompt Templates
 

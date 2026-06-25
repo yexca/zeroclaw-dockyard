@@ -113,7 +113,9 @@ Core fields:
   `[providers.models.<family>.<alias>]` entry. Use aliases to keep multiple
   profiles for the same family, such as `openai.default` and `openai.review`.
 - `Base URL`: endpoint URL. For OpenAI-compatible endpoints, include the API
-  prefix when required, for example `https://api.example.com/v1`.
+  prefix when required, for example `https://api.example.com/v1`. Ollama's
+  OpenAI-compatible endpoint also uses `/v1`, for example
+  `http://host.docker.internal:11434/v1`.
 - `Model`: provider-local model ID.
 - `Wire API`: request protocol. Use `chat_completions` for ordinary
   `/v1/chat/completions` or compatible endpoints. Use `responses` only for
@@ -128,6 +130,10 @@ settings, and Ollama context/output overrides.
 The frontend validates required strings, numeric ranges, URLs, and JSON fields
 before saving. Invalid fields are reported in a browser alert with the specific
 field name.
+
+The plug-shaped test button sends a minimal request with the current form
+values, including unsaved edits. It supports `chat_completions` and `responses`
+profiles, reports latency on success, and redacts credentials from errors.
 
 ## Vision LLM Profiles
 

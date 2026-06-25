@@ -165,6 +165,10 @@ minimal remote profile usually includes:
   `[providers.models.<provider_family>.<provider_alias>]` TOML section.
 - `model`: provider-local model ID.
 - `base_url`: endpoint URL. The manager writes this to ZeroClaw's `uri` field.
+  OpenAI-compatible endpoints normally include their API prefix, such as
+  `https://api.example.com/v1`. For Ollama with `chat_completions`, use the
+  OpenAI-compatible `/v1` endpoint, such as
+  `http://host.docker.internal:11434/v1`.
 - `wire_api`: `chat_completions` or `responses`.
 - `timeout_secs`: request timeout in seconds.
 - `api_key`: optional provider credential. Local providers and external auth
