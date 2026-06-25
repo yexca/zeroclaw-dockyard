@@ -9,7 +9,7 @@ import yaml
 
 from manager.backend.agent_renderer import AgentRenderer, REQUIRED_ENV_KEYS
 from manager.backend.ai_fill import PromptTemplateAiFiller
-from manager.backend.config_store import ConfigError, ConfigStore, redact
+from manager.backend.config_store import ConfigError, ConfigStore, item_id, redact
 from manager.backend.config_validator import ConfigValidator
 from manager.backend.docker_controller import (
     AGENT_ID_LABEL,
@@ -157,13 +157,63 @@ class ConfigStoreTest(unittest.TestCase):
 
     def test_profile_crud_is_persisted(self) -> None:
         created = self.store.create_item("llm", {"id": "local", "model": "qwen"})
-        updated = self.store.update_item("llm", "local", {"id": "local", "model": "qwen2.5"})
-        deleted = self.store.delete_item("llm", "local")
+        local_path = Path(self.temp_dir.name) / "config" / "llm" / "local.yaml"
+        self.assertTrue(local_path.exists())
+
+        updated = self.store.update_item("llm", "local", {"id": "renamed", "model": "qwen2.5"})
+        renamed_path = Path(self.temp_dir.name) / "config" / "llm" / "renamed.yaml"
+        self.assertFalse(local_path.exists())
+        self.assertTrue(renamed_path.exists())
+
+        deleted = self.store.delete_item("llm", "renamed")
 
         self.assertEqual(created["model"], "qwen")
         self.assertEqual(updated["model"], "qwen2.5")
-        self.assertEqual(deleted["id"], "local")
+        self.assertEqual(deleted["id"], "renamed")
+        self.assertFalse(renamed_path.exists())
+        self.assertNotIn("renamed", [item["id"] for item in self.store.list_collection("llm")])
         self.assertTrue(self.config_path.exists())
+
+    def test_module_collection_rename_and_delete_prunes_stale_files(self) -> None:
+        cases = [
+            ("vision", "vision", {"model": "gpt-4o"}),
+            ("matrix", "matrix", {"homeserver": "https://matrix.example.com"}),
+            ("mcp", "mcp", {"enabled": True}),
+            ("agents", "agents", {"host_port": 42641, "llm_profile": "deepseek-text"}),
+            ("skill_bundles", "skills", {"directory": "shared/skills/local"}),
+        ]
+        for kind, dirname, extra in cases:
+            with self.subTest(kind=kind):
+                created = self.store.create_item(kind, {"id": f"{kind}-old", **extra})
+                old_path = Path(self.temp_dir.name) / "config" / dirname / f"{kind}-old.yaml"
+                new_path = Path(self.temp_dir.name) / "config" / dirname / f"{kind}-new.yaml"
+                self.assertTrue(old_path.exists())
+
+                updated = self.store.update_item(kind, item_id(created), {"id": f"{kind}-new", **extra})
+                self.assertEqual(item_id(updated), f"{kind}-new")
+                self.assertFalse(old_path.exists())
+                self.assertTrue(new_path.exists())
+
+                deleted = self.store.delete_item(kind, f"{kind}-new")
+                self.assertEqual(item_id(deleted), f"{kind}-new")
+                self.assertFalse(new_path.exists())
+                self.assertNotIn(f"{kind}-new", [item_id(item) for item in self.store.list_collection(kind)])
+
+    def test_prompt_template_rename_and_delete_prunes_stale_directories(self) -> None:
+        created = self.store.create_item("prompt_templates", {"id": "prompt-old", "files": {"AGENTS.md": "old"}})
+        old_dir = Path(self.temp_dir.name) / "config" / "prompts" / "prompt-old"
+        new_dir = Path(self.temp_dir.name) / "config" / "prompts" / "prompt-new"
+        self.assertTrue(old_dir.is_dir())
+
+        updated = self.store.update_item("prompt_templates", item_id(created), {"id": "prompt-new", "files": {"AGENTS.md": "new"}})
+        self.assertEqual(item_id(updated), "prompt-new")
+        self.assertFalse(old_dir.exists())
+        self.assertTrue(new_dir.is_dir())
+
+        deleted = self.store.delete_item("prompt_templates", "prompt-new")
+        self.assertEqual(item_id(deleted), "prompt-new")
+        self.assertFalse(new_dir.exists())
+        self.assertNotIn("prompt-new", [item_id(item) for item in self.store.list_collection("prompt_templates")])
 
     def test_duplicate_item_raises_structured_error(self) -> None:
         with self.assertRaises(ConfigError) as context:

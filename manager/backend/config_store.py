@@ -733,24 +733,35 @@ class ConfigStore:
 
     def _write_module_collection(self, directory: Path, items: list[Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)
+        expected_files: set[str] = set()
         for item in items:
             if not isinstance(item, dict):
                 continue
             identifier = item_id(item)
             if not identifier:
                 continue
-            path = directory / f"{safe_file_stem(identifier)}.yaml"
+            filename = f"{safe_file_stem(identifier)}.yaml"
+            expected_files.add(filename)
+            path = directory / filename
             self._atomic_write_yaml(path, copy.deepcopy(item))
+        for path in directory.glob("*.yaml"):
+            if path.name.endswith(".example.yaml") or path.stem in {"example", "manifest"}:
+                continue
+            if path.name not in expected_files:
+                path.unlink()
 
     def _write_prompt_modules(self, directory: Path, templates: list[Any]) -> None:
         directory.mkdir(parents=True, exist_ok=True)
+        expected_dirs: set[str] = set()
         for template in templates:
             if not isinstance(template, dict):
                 continue
             template_id = item_id(template)
             if not template_id:
                 continue
-            prompt_dir = directory / safe_file_stem(template_id)
+            dirname = safe_file_stem(template_id)
+            expected_dirs.add(dirname)
+            prompt_dir = directory / dirname
             prompt_dir.mkdir(parents=True, exist_ok=True)
             files = template.get("files") if isinstance(template.get("files"), dict) else {}
             manifest_files: dict[str, str] = {}
@@ -771,6 +782,11 @@ class ConfigStore:
             if warnings:
                 manifest["warnings"] = warnings
             self._atomic_write_yaml(prompt_dir / "manifest.yaml", manifest)
+        for prompt_dir in directory.iterdir():
+            if not prompt_dir.is_dir() or prompt_dir.name == "example":
+                continue
+            if prompt_dir.name not in expected_dirs:
+                shutil.rmtree(prompt_dir)
 
     def _prompt_warnings(self, files: dict[str, str]) -> list[dict[str, Any]]:
         warnings: list[dict[str, Any]] = []
