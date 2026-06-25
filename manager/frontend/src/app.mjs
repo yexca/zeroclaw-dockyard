@@ -327,7 +327,7 @@ const LLM_PRESETS = {
     provider_family: "ollama",
     provider_alias: "local",
     model: "qwen2.5:14b",
-    base_url: "http://host.docker.internal:11434",
+    base_url: "http://host.docker.internal:11434/v1",
     wire_api: "chat_completions",
     timeout_secs: 600
   },
