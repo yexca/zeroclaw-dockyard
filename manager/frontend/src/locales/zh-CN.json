@@ -262,7 +262,9 @@
     "skillBody": "技能正文",
     "supportFile": "支持文件",
     "supportFilePath": "支持文件路径",
-    "supportFileContent": "支持文件内容"
+    "supportFileContent": "支持文件内容",
+    "supportFileType": "??????",
+    "supportFileName": "?????"
   },
   "templateApply": {
     "keep": "保留现有文件",
@@ -295,7 +297,8 @@
     "invalidMaxNumberField": "{field} 必须小于或等于 {max}。",
     "invalidUrlField": "{field} 必须是有效的 http/https URL，请再次确认。",
     "requiredField": "{field} 是必填项，请填写。",
-    "invalidTemplateFile": "模板文件名必须是普通工作区文件名，只能使用字母、数字、点、下划线或连字符。"
+    "invalidTemplateFile": "模板文件名必须是普通工作区文件名，只能使用字母、数字、点、下划线或连字符。",
+    "invalidSupportFileName": "?????????????????????????????"
   },
   "confirm": {
     "deleteAgent": "删除这个智能体？此操作不可撤销。",
@@ -421,7 +424,9 @@
       "body": "Agent 使用该技能时读取的 Markdown 指令正文。",
       "supportFile": "选择一个已有支持文件加载到编辑器。",
       "supportFilePath": "references/、scripts/ 或 assets/ 下的相对路径。scripts/ 需要开启允许脚本。",
-      "supportFileContent": "写入支持文件路径的内容。"
+      "supportFileContent": "写入支持文件路径的内容。",
+      "supportFileType": "?????????????",
+      "supportFileName": "???????????????????????? notes.md?"
     }
   },
   "vision": {
@@ -504,6 +509,19 @@
     "bundleSkills": "技能包内技能",
     "bundleSkillsHelp": "技能以 SKILL.md 加 scripts/、references/ 和 assets/ 子目录的形式存放在技能包目录下。",
     "noSkills": "这个技能包里还没有技能。",
-    "supportFiles": "支持文件"
+    "supportFiles": "支持文件",
+    "tabsLabel": "技能分区",
+    "tabs": {
+      "bundles": "???",
+      "library": "???",
+      "support": "????",
+      "runtime": "????"
+    },
+    "runtimeHelp": "全局技能加载、仓库、创建和改进设置，会渲染到智能体运行时配置。",
+    "bundleSettings": "技能包设置",
+    "bundleSettingsHelp": "配置当前技能包别名、目录，以及可选的包含/排除过滤。",
+    "supportFilesHelp": "????????????? references/?scripts/ ? assets/ ?????",
+    "noSupportFiles": "还没有支持文件。",
+    "loadingSkill": "正在加载所选技能。"
   }
 }

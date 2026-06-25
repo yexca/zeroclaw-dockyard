@@ -91,7 +91,20 @@
     "bundleSkills": "Bundle skills",
     "bundleSkillsHelp": "Skills are stored as SKILL.md plus scripts/, references/, and assets/ under the bundle directory.",
     "noSkills": "No skills in this bundle yet.",
-    "supportFiles": "Support files"
+    "supportFiles": "Support files",
+    "tabsLabel": "Skills sections",
+    "tabs": {
+      "bundles": "Bundles",
+      "library": "Skill library",
+      "support": "Support files",
+      "runtime": "Runtime settings"
+    },
+    "runtimeHelp": "Global skill loading, registry, creation, and improvement settings rendered into agent runtime config.",
+    "bundleSettings": "Skill bundle settings",
+    "bundleSettingsHelp": "Configure the selected bundle alias, directory, and optional include/exclude filters.",
+    "supportFilesHelp": "Choose a bundle and skill, then edit files under references/, scripts/, or assets/.",
+    "noSupportFiles": "No support files yet.",
+    "loadingSkill": "Loading selected skill."
   },
   "prompts": {
     "title": "Prompt Templates",
@@ -204,6 +217,8 @@
     "skillBody": "Skill body",
     "supportFile": "Support file",
     "supportFilePath": "Support file path",
+    "supportFileType": "Support file type",
+    "supportFileName": "Support file name",
     "supportFileContent": "Support file content",
     "templateApplyMode": "Template apply mode",
     "matrixUser": "Matrix user",
@@ -310,7 +325,8 @@
     "invalidMaxNumberField": "{field} must be less than or equal to {max}.",
     "invalidUrlField": "{field} must be a valid http/https URL. Please check it again.",
     "requiredField": "{field} is required. Please fill it in.",
-    "invalidTemplateFile": "Template file names must be plain workspace file names using letters, numbers, dot, underscore, or hyphen."
+    "invalidTemplateFile": "Template file names must be plain workspace file names using letters, numbers, dot, underscore, or hyphen.",
+    "invalidSupportFileName": "Support file names must include a file extension and stay inside the selected support file type."
   },
   "confirm": {
     "deleteAgent": "Delete this agent? This cannot be undone.",
@@ -436,6 +452,8 @@
       "body": "Markdown instructions the agent reads when using this skill.",
       "supportFile": "Existing support file to load into the editor.",
       "supportFilePath": "Relative path under references/, scripts/, or assets/. scripts/ requires Allow skill scripts.",
+      "supportFileType": "Top-level support directory for this file.",
+      "supportFileName": "File name or nested path under the selected type. Include a file extension, such as notes.md.",
       "supportFileContent": "Content written to the support file path."
     }
   },

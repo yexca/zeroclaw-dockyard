@@ -6,6 +6,7 @@ const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", 
 const PROJECT_OPTIONAL_FILES = ["PROACTIVE.md"];
 const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", ...PROJECT_OPTIONAL_FILES];
 const SKILL_SUPPORT_DIRS = ["references", "scripts", "assets"];
+const SKILLS_VIEWS = ["bundles", "library", "support", "runtime"];
 const DEFAULT_ZEROCLAW_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian";
 const DEFAULT_AGENT_HOST_PORT = 42641;
 const DEFAULT_PROACTIVE_PROMPT =
@@ -390,6 +391,7 @@ const state = {
   selectedSkillBundleId: "",
   selectedSkillName: "",
   selectedSkillFile: "",
+  selectedSkillsView: "bundles",
   skillBundleSkills: {},
   skillDocuments: {},
   skillFileDraft: "",
@@ -651,6 +653,8 @@ function fieldDisplayName(name) {
     server_name: t("fields.serverName"),
     transport: t("fields.transport"),
     url: t("fields.url"),
+    support_file_type: t("fields.supportFileType"),
+    support_file_name: t("fields.supportFileName"),
     template_file: t("fields.templateFile"),
     description: t("fields.description")
   };
@@ -994,6 +998,31 @@ function templateFileHelp(file) {
   if (file === "HEARTBEAT.md") return t("prompts.heartbeatFileHelp");
   if (PROJECT_OPTIONAL_FILES.includes(file)) return t("prompts.optionalServiceFileHelp");
   return t("prompts.customFileHelp");
+}
+
+function supportPathParts(path) {
+  const text = String(path || "").replaceAll("\\", "/").replace(/^\/+/, "");
+  const [type = "references", ...rest] = text.split("/");
+  return {
+    type: SKILL_SUPPORT_DIRS.includes(type) ? type : "references",
+    filename: rest.join("/") || ""
+  };
+}
+
+function supportFilePathFromForm(data) {
+  const type = String(data.get("support_file_type") || "references").trim();
+  const filename = String(data.get("support_file_name") || "").trim().replaceAll("\\", "/").replace(/^\/+/, "");
+  if (!SKILL_SUPPORT_DIRS.includes(type)) {
+    throw new FormValidationError(t("messages.requiredField").replace("{field}", fieldDisplayName("support_file_type")), "support_file_type");
+  }
+  if (!filename || filename.includes("..") || filename.endsWith("/") || !filename.split("/").every(Boolean)) {
+    throw new FormValidationError(t("messages.invalidSupportFileName"), "support_file_name");
+  }
+  const leaf = filename.split("/").pop() || "";
+  if (!leaf.includes(".") || leaf.startsWith(".") || leaf.endsWith(".")) {
+    throw new FormValidationError(t("messages.invalidSupportFileName"), "support_file_name");
+  }
+  return `${type}/${filename}`;
 }
 
 function renderTemplateAddFileControl() {
@@ -2013,9 +2042,44 @@ function renderSkillsManager() {
     <header class="section-header">
       <div><h2>${escapeHtml(t("skills.title"))}</h2><p>${escapeHtml(t("skills.subtitle"))}</p></div>
     </header>
+    ${renderSkillsViewTabs()}
+    ${renderSelectedSkillsView()}
+  `;
+}
+
+function renderSkillsViewTabs() {
+  return `
+    <div class="sub-tabs" role="tablist" aria-label="${escapeHtml(t("skills.tabsLabel"))}">
+      ${SKILLS_VIEWS.map(
+        (view) => `
+          <button
+            type="button"
+            class="sub-tab ${state.selectedSkillsView === view ? "active" : ""}"
+            data-skills-view="${escapeHtml(view)}"
+            role="tab"
+            aria-selected="${state.selectedSkillsView === view ? "true" : "false"}"
+          >${escapeHtml(t(`skills.tabs.${view}`))}</button>
+        `
+      ).join("")}
+    </div>
+  `;
+}
+
+function renderSelectedSkillsView() {
+  if (!SKILLS_VIEWS.includes(state.selectedSkillsView)) state.selectedSkillsView = "library";
+  if (state.selectedSkillsView === "bundles") return renderSkillBundlesView();
+  if (state.selectedSkillsView === "support") return renderSkillSupportView();
+  if (state.selectedSkillsView === "runtime") return renderSkillRuntimeSettingsView();
+  return renderSkillLibraryView();
+}
+
+function renderSkillRuntimeSettingsView() {
+  return `
     <form class="form-panel" data-form="skills-settings">
-      <details class="form-section">
-        <summary>${escapeHtml(t("skills.settings"))}</summary>
+      <section class="form-section">
+        <div class="section-header compact">
+          <div><h3>${escapeHtml(t("skills.settings"))}</h3><p>${escapeHtml(t("skills.runtimeHelp"))}</p></div>
+        </div>
         <div class="form-grid">
           ${checkboxField("fields.allowScripts", "allow_scripts", state.config.skills?.allow_scripts === true, "fieldHelp.skills.allowScripts")}
           ${checkboxField("fields.openSkillsEnabled", "open_skills_enabled", state.config.skills?.open_skills_enabled === true, "fieldHelp.skills.openSkillsEnabled")}
@@ -2032,39 +2096,71 @@ function renderSkillsManager() {
           ${field("fields.skillImprovementMaxReview", "skill_improvement_max_review_iterations", state.config.skills?.skill_improvement?.max_review_iterations ?? 8, 'type="number" min="1"', "fieldHelp.skills.skillImprovementMaxReview")}
         </div>
         <div class="button-row form-actions">${actionButton("skills-settings-save", "actions.save", "primary")}</div>
-      </details>
+      </section>
     </form>
+  `;
+}
+
+function renderSkillLibraryView() {
+  const bundle = selectedSkillBundle();
+  const doc = selectedSkillDoc();
+  return `
+    <div class="split">
+      ${renderListPanel(
+        "skill-bundles",
+        skillBundles(),
+        state.selectedSkillBundleId,
+        `${actionButton("skill-bundle-new", "actions.create", "primary")}`
+      )}
+      <div class="form-panel">
+        ${bundle ? renderSkillListAndEditor(bundle, doc) : renderEmptyEditor("skills.empty")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSkillBundlesView() {
+  const bundle = selectedSkillBundle();
+  return `
     <div class="split">
       ${renderListPanel(
         "skill-bundles",
         skillBundles(),
         state.selectedSkillBundleId,
         `${actionButton("skill-bundle-new", "actions.create", "primary")}
-         ${actionButton("skill-bundle-save", "actions.save", "secondary", !bundle)}
          ${actionButton("skill-bundle-delete-current", "actions.delete", "danger", !bundle)}`
       )}
       <div class="form-panel">
-        ${bundle ? renderSkillBundleEditor(bundle) : renderEmptyEditor("skills.empty")}
+        ${bundle ? renderSkillBundleSettings(bundle) : renderEmptyEditor("skills.empty")}
       </div>
     </div>
   `;
 }
 
-function renderSkillBundleEditor(bundle) {
+function renderSkillBundleSettings(bundle) {
   const bundleId = itemId(bundle);
-  const skills = state.skillBundleSkills[bundleId] || [];
-  const doc = selectedSkillDoc();
   return `
     <form data-form="skill-bundle">
       <section class="form-section">
+        <div class="section-header compact">
+          <div><h3>${escapeHtml(t("skills.bundleSettings"))}</h3><p>${escapeHtml(t("skills.bundleSettingsHelp"))}</p></div>
+        </div>
         <div class="form-grid">
           ${field("fields.id", "id", bundleId, "required", "fieldHelp.skills.bundleId")}
           ${field("fields.directory", "directory", bundle.directory || `shared/skills/${bundleId}`, "", "fieldHelp.skills.bundleDirectory")}
           ${textareaField("fields.includeSkills", "include", asLines(bundle.include), "", "fieldHelp.skills.includeSkills")}
           ${textareaField("fields.excludeSkills", "exclude", asLines(bundle.exclude), "", "fieldHelp.skills.excludeSkills")}
         </div>
+        <div class="button-row form-actions">${actionButton("skill-bundle-save", "actions.save", "primary")}</div>
       </section>
     </form>
+  `;
+}
+
+function renderSkillListAndEditor(bundle, doc) {
+  const bundleId = itemId(bundle);
+  const skills = state.skillBundleSkills[bundleId] || [];
+  return `
     <section class="form-section">
       <header class="section-header compact">
         <div><h3>${escapeHtml(t("skills.bundleSkills"))}</h3><p>${escapeHtml(t("skills.bundleSkillsHelp"))}</p></div>
@@ -2104,7 +2200,6 @@ function renderSkillCreateForm() {
 }
 
 function renderSkillDocumentEditor(doc) {
-  const fileOptions = (doc.files || []).map((file) => `<option value="${escapeHtml(file)}">${escapeHtml(file)}</option>`).join("");
   return `<form data-form="skill-doc">
     <div class="form-grid">
       ${field("fields.name", "name", doc.frontmatter?.name || doc.name || "", "required", "fieldHelp.skills.skillName")}
@@ -2120,20 +2215,93 @@ function renderSkillDocumentEditor(doc) {
       ${actionButton("skill-save", "actions.save", "primary")}
       ${actionButton("skill-archive", "actions.archive", "danger")}
     </div>
-    <details class="advanced-panel">
-      <summary>${escapeHtml(t("skills.supportFiles"))}</summary>
-      <div class="form-grid">
-        ${selectField("fields.supportFile", "support_file_select", `<option value="">${escapeHtml(t("common.none"))}</option>${fileOptions}`, "", "fieldHelp.skills.supportFile")}
-        ${field("fields.supportFilePath", "support_file_path", state.skillFilePathDraft || "references/notes.md", "", "fieldHelp.skills.supportFilePath")}
-        ${textareaField("fields.supportFileContent", "support_file_content", state.skillFileDraft || "", "", "fieldHelp.skills.supportFileContent")}
-      </div>
-      <div class="button-row form-actions">
-        ${actionButton("skill-file-load", "actions.load")}
-        ${actionButton("skill-file-save", "actions.save", "primary")}
-        ${actionButton("skill-file-delete", "actions.delete", "danger")}
-      </div>
-    </details>
   </form>`;
+}
+
+function renderSkillSupportView() {
+  const bundle = selectedSkillBundle();
+  const skill = selectedSkill();
+  const doc = selectedSkillDoc();
+  for (const row of skillBundles()) {
+    const bundleId = itemId(row);
+    if (bundleId && !state.skillBundleSkills[bundleId] && !state.busy) {
+      queueMicrotask(() => refreshSkillList(bundleId).then(() => render()).catch((error) => showError(error.message || String(error))));
+    }
+  }
+  if (!bundle) return renderEmptyEditor("skills.empty");
+  if (!skill) return renderEmptyEditor("skills.noSkills");
+  if (!doc) return renderEmptyEditor("skills.loadingSkill");
+  const path = state.skillFilePathDraft || state.selectedSkillFile || "references/notes.md";
+  const pathParts = supportPathParts(path);
+  return `
+    <section class="form-section">
+      <header class="section-header compact">
+        <div>
+          <h3>${escapeHtml(t("skills.supportFiles"))}</h3>
+          <p>${escapeHtml(itemId(bundle))} / ${escapeHtml(skill.name)} · ${escapeHtml(t("skills.supportFilesHelp"))}</p>
+        </div>
+      </header>
+      <form class="form-panel" data-form="skill-doc">
+        <div class="support-file-layout">
+          ${renderSupportSkillTree()}
+          <div class="form-grid">
+            ${selectField(
+              "fields.supportFileType",
+              "support_file_type",
+              SKILL_SUPPORT_DIRS.map((type) => `<option value="${type}" ${pathParts.type === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join(""),
+              "",
+              "fieldHelp.skills.supportFileType"
+            )}
+            ${field("fields.supportFileName", "support_file_name", pathParts.filename || "notes.md", "", "fieldHelp.skills.supportFileName")}
+            ${textareaField("fields.supportFileContent", "support_file_content", state.skillFileDraft || "", "", "fieldHelp.skills.supportFileContent")}
+          </div>
+        </div>
+        <div class="button-row form-actions">
+          ${actionButton("skill-file-load", "actions.load")}
+          ${actionButton("skill-file-save", "actions.save", "primary")}
+          ${actionButton("skill-file-delete", "actions.delete", "danger")}
+        </div>
+      </form>
+    </section>
+  `;
+}
+
+function renderSupportSkillTree() {
+  const selectedBundleId = itemId(selectedSkillBundle());
+  return `
+    <aside class="support-file-list">
+      ${skillBundles()
+        .map((bundle) => {
+          const bundleId = itemId(bundle);
+          const open = bundleId === selectedBundleId;
+          const skills = state.skillBundleSkills[bundleId] || [];
+          return `
+            <details class="skill-tree-bundle" ${open ? "open" : ""}>
+              <summary>${escapeHtml(bundleId)}</summary>
+              <div class="skill-tree-items">
+                ${
+                  skills.length
+                    ? skills
+                        .map(
+                          (row) => `
+                            <button
+                              type="button"
+                              class="list-item ${bundleId === selectedBundleId && row.name === state.selectedSkillName ? "active" : ""}"
+                              data-support-skill-bundle="${escapeHtml(bundleId)}"
+                              data-support-skill-name="${escapeHtml(row.name)}"
+                            ><span class="list-item-main">${escapeHtml(row.name)}</span></button>
+                          `
+                        )
+                        .join("")
+                    : `<div class="empty-state compact">${escapeHtml(t("skills.noSkills"))}</div>`
+                }
+              </div>
+            </details>
+          `;
+        })
+        .join("")}
+    </aside>
+  `;
 }
 
 function renderPromptTemplates() {
@@ -3095,14 +3263,23 @@ async function archiveSkill() {
   }, "messages.deleted");
 }
 
-async function loadSkillSupportFile() {
+async function loadSkillSupportFile(filePath = "") {
   const form = document.querySelector('[data-form="skill-doc"]');
-  const selected = String(new FormData(form).get("support_file_select") || "").trim();
+  let selected = String(filePath || "").trim();
+  if (!selected) {
+    try {
+      selected = supportFilePathFromForm(new FormData(form));
+    } catch (error) {
+      if (error instanceof FormValidationError) return alertValidation(error);
+      throw error;
+    }
+  }
   if (!selected) return;
   return runAction(async () => {
     const result = await api(
       `/api/skills/bundles/${encodeURIComponent(state.selectedSkillBundleId)}/skills/${encodeURIComponent(state.selectedSkillName)}/files/${encodeURIComponent(selected)}`
     );
+    state.selectedSkillFile = result.file_path || selected;
     state.skillFilePathDraft = result.file_path || selected;
     state.skillFileDraft = result.content || "";
   });
@@ -3111,13 +3288,20 @@ async function loadSkillSupportFile() {
 async function saveSkillSupportFile() {
   const form = document.querySelector('[data-form="skill-doc"]');
   const data = new FormData(form);
-  const filePath = String(data.get("support_file_path") || "").trim();
+  let filePath;
+  try {
+    filePath = supportFilePathFromForm(data);
+  } catch (error) {
+    if (error instanceof FormValidationError) return alertValidation(error);
+    throw error;
+  }
   const content = String(data.get("support_file_content") || "");
   return runAction(async () => {
     await api(`/api/skills/bundles/${encodeURIComponent(state.selectedSkillBundleId)}/skills/${encodeURIComponent(state.selectedSkillName)}/files`, {
       method: "POST",
       body: JSON.stringify({ file_path: filePath, content })
     });
+    state.selectedSkillFile = filePath;
     state.skillFilePathDraft = filePath;
     state.skillFileDraft = content;
     await refreshSkillDocument();
@@ -3126,14 +3310,22 @@ async function saveSkillSupportFile() {
 
 async function deleteSkillSupportFile() {
   const form = document.querySelector('[data-form="skill-doc"]');
-  const filePath = String(new FormData(form).get("support_file_path") || "").trim();
+  let filePath;
+  try {
+    filePath = supportFilePathFromForm(new FormData(form));
+  } catch (error) {
+    if (error instanceof FormValidationError) return alertValidation(error);
+    throw error;
+  }
   if (!filePath || !(await confirmDanger("confirm.deleteSkillFile"))) return;
   return runAction(async () => {
     await api(
       `/api/skills/bundles/${encodeURIComponent(state.selectedSkillBundleId)}/skills/${encodeURIComponent(state.selectedSkillName)}/files/${encodeURIComponent(filePath)}`,
       { method: "DELETE" }
     );
+    state.selectedSkillFile = "";
     state.skillFileDraft = "";
+    state.skillFilePathDraft = "references/notes.md";
     await refreshSkillDocument();
   }, "messages.deleted");
 }
@@ -3162,6 +3354,13 @@ function bindEvents() {
       if (tab === "resources" && !state.dockerResourcesRequested) {
         await refreshDockerResourcesInBackground();
       }
+      return;
+    }
+
+    const skillsView = event.target.closest("[data-skills-view]")?.dataset.skillsView;
+    if (skillsView) {
+      state.selectedSkillsView = SKILLS_VIEWS.includes(skillsView) ? skillsView : "bundles";
+      render();
       return;
     }
 
@@ -3202,10 +3401,35 @@ function bindEvents() {
     const skillName = event.target.closest("[data-skill-name]")?.dataset.skillName;
     if (skillName) {
       state.selectedSkillName = skillName;
+      state.selectedSkillFile = "";
       state.skillFileDraft = "";
       state.skillFilePathDraft = "references/notes.md";
       await refreshSkillDocument(state.selectedSkillBundleId, skillName);
       render();
+      return;
+    }
+
+    const supportSkill = event.target.closest("[data-support-skill-name]");
+    if (supportSkill) {
+      const bundleId = supportSkill.dataset.supportSkillBundle;
+      const skillName = supportSkill.dataset.supportSkillName;
+      if (!bundleId || !skillName) return;
+      state.selectedSkillBundleId = bundleId;
+      state.selectedSkillName = skillName;
+      state.selectedSkillFile = "";
+      state.skillFileDraft = "";
+      state.skillFilePathDraft = "references/notes.md";
+      if (!state.skillBundleSkills[bundleId]) await refreshSkillList(bundleId);
+      await refreshSkillDocument(bundleId, skillName);
+      render();
+      return;
+    }
+
+    const skillFile = event.target.closest("[data-skill-file]")?.dataset.skillFile;
+    if (skillFile) {
+      state.selectedSkillFile = skillFile;
+      state.skillFilePathDraft = skillFile;
+      await loadSkillSupportFile(skillFile);
       return;
     }
 
@@ -3266,8 +3490,12 @@ function bindEvents() {
     if (event.target.matches('[name="reference_file"]')) {
       syncAiFillDraftFromForm();
     }
-    if (event.target.matches('[name="support_file_select"]')) {
-      state.skillFilePathDraft = event.target.value || state.skillFilePathDraft;
+    if (event.target.matches('[name="support_file_type"], [name="support_file_name"]')) {
+      try {
+        state.skillFilePathDraft = supportFilePathFromForm(new FormData(event.target.form));
+      } catch (_error) {
+        // Keep partially typed paths in the form; validation runs on load/save/delete.
+      }
       render();
     }
   });
