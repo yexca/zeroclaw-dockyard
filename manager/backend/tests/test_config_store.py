@@ -608,7 +608,8 @@ class DockerControllerTest(unittest.TestCase):
         self.assertIsNotNone(spec)
         assert spec is not None
         self.assertEqual(spec.container_name, "zeroclaw-proactive-agent1")
-        self.assertEqual(spec.environment["PROACTIVE_AGENT_URL"], "http://host.docker.internal:42641/webhook?agent=agent1")
+        self.assertEqual(spec.environment["PROACTIVE_AGENT"], "agent1")
+        self.assertEqual(spec.environment["PROACTIVE_AGENT_URL"], "http://host.docker.internal:42641/webhook?agent=main")
         self.assertEqual(spec.environment["PROACTIVE_TARGET"], "@you:matrix.example.com")
         self.assertEqual(spec.storage_driver, "volume")
         self.assertEqual(spec.volume_name, "zeroclaw-dockyard-agent-agent1-data")

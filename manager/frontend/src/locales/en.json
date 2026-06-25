@@ -449,7 +449,7 @@
       "proactiveQuietHours": "Local quiet-hour range like 23-8. Leave blank to disable quiet hours.",
       "proactiveTimezone": "Timezone used for quiet hours, for example Asia/Tokyo.",
       "proactiveChannel": "Matrix channel alias passed to send_message_to_peer. Default is matrix.home.",
-      "proactiveAgentUrl": "Advanced full gateway URL. Leave blank to use this agent's host port and /webhook?agent=<id> automatically.",
+      "proactiveAgentUrl": "Advanced full gateway URL. Leave blank to use this agent's host port and /webhook?agent=main automatically.",
       "proactivePrompt": "Optional override for the wake prompt. Leave blank to use the built-in PROACTIVE.md-oriented prompt."
     },
     "matrix": {

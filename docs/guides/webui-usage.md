@@ -205,7 +205,10 @@ agent's Matrix `device_id` override. Restart the agent afterwards so
 
 The Proactive sidecar section can create one companion container per agent.
 The sidecar reads the agent's configured `host_port` and calls that agent's
-gateway automatically through `/webhook?agent=<id>`. Operators normally do not
+gateway automatically through `/webhook?agent=main`. The manager agent ID is
+still used for container names, labels, WebUI state, and sidecar scheduling
+state; the runtime ZeroClaw agent alias inside each container is `main`.
+Operators normally do not
 enter a port in the proactive form; the advanced Gateway URL override exists for
 custom gateways or experiments. If no explicit target is configured, the
 sidecar uses the first External peers entry. The default wake prompt asks the

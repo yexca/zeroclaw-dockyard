@@ -104,7 +104,10 @@ Common agent fields:
 - `channel`: Matrix channel alias passed to `send_message_to_peer`. Default:
   `matrix.home`.
 - `agent_url`: advanced full gateway URL override. Empty uses the agent's
-  `host_port` automatically as `http://host.docker.internal:<port>/webhook?agent=<id>`.
+  `host_port` automatically as `http://host.docker.internal:<port>/webhook?agent=main`.
+  The manager agent ID is still used for WebUI state, container names, labels,
+  and proactive scheduling state; `main` is the runtime ZeroClaw agent alias
+  rendered inside each managed container.
 - `random_min_minutes`, `random_max_minutes`: randomized wake interval range.
 - `poll_seconds`: sidecar polling interval. Minimum recommended value: `30`.
 - `quiet_hours`: local quiet-hour range such as `23-8`; empty disables quiet

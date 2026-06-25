@@ -696,7 +696,7 @@ class DockerApiController:
         bootstrap_dir = Path("/app/bootstrap" if storage_driver == "volume" else str(host_bootstrap_dir))
         image = str(proactive.get("image") or DEFAULT_PROACTIVE_IMAGE)
         gateway_host = str(proactive.get("gateway_host") or "host.docker.internal")
-        default_agent_url = f"http://{gateway_host}:{agent_spec.host_port}/webhook?{urlencode({'agent': agent_spec.agent_id})}"
+        default_agent_url = f"http://{gateway_host}:{agent_spec.host_port}/webhook?{urlencode({'agent': 'main'})}"
         agent_url = str(proactive.get("agent_url") or default_agent_url)
         env = {
             "PROACTIVE_ENABLED": "true",

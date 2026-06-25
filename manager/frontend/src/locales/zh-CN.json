@@ -405,7 +405,7 @@
       "proactiveQuietHours": "本地免打扰时段，例如 23-8。留空则禁用免打扰。",
       "proactiveTimezone": "免打扰时段使用的时区，例如 Asia/Tokyo。",
       "proactiveChannel": "传给 send_message_to_peer 的 Matrix channel alias。默认是 matrix.home。",
-      "proactiveAgentUrl": "高级完整网关 URL。留空时自动使用此 agent 的 host port 和 /webhook?agent=<id>。",
+      "proactiveAgentUrl": "高级完整网关 URL。留空时自动使用此 agent 的 host port 和 /webhook?agent=main。",
       "proactivePrompt": "可选的唤醒提示词覆盖。留空时使用内置的 PROACTIVE.md 导向提示词。",
       "visionProfile": "可选的视觉模型配置，用于图片附件。留空时不为此 agent 启用专用视觉路由。",
       "skillBundles": "此智能体要加载的技能包别名，每行一个。在“技能”页中创建和编辑技能包。"
