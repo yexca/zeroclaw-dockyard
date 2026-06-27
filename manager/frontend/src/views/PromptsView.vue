@@ -37,17 +37,48 @@
           </div>
           <div class="button-row form-field--wide">
             <UiButton variant="primary" type="submit"><Save />Save</UiButton>
+            <UiButton type="button" @click="aiFillOpen = !aiFillOpen"><Sparkles />AI fill</UiButton>
           </div>
         </form>
         <p v-else class="empty-text">Select or create a template.</p>
       </UiCard>
     </div>
+
+    <UiCard v-if="draft && aiFillOpen" title="AI fill" description="Generate selected prompt files into this browser-side draft. Review before saving.">
+      <form class="form-grid" @submit.prevent="runAiFill">
+        <FormField v-model="aiFill.llm_profile" label="LLM profile" :options="llmOptions" />
+        <FormField v-model="aiFill.description" label="Agent description" wide />
+        <FormField v-model="aiFill.instruction" label="Generation instruction" textarea wide />
+        <div class="form-field form-field--wide">
+          <span>Target files</span>
+          <div class="file-chip-grid">
+            <label v-for="file in fileNames" :key="file" class="check-row file-chip">
+              <input v-model="aiFill.files" :value="file" type="checkbox" />
+              <span>{{ file }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-field form-field--wide">
+          <span>Reference files</span>
+          <div class="file-chip-grid">
+            <label v-for="file in fileNames" :key="file" class="check-row file-chip">
+              <input v-model="aiFill.reference_files" :value="file" type="checkbox" />
+              <span>{{ file }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="button-row form-field--wide">
+          <UiButton variant="primary" type="submit"><Sparkles />Generate</UiButton>
+          <UiButton type="button" @click="aiFillOpen = false">Close</UiButton>
+        </div>
+      </form>
+    </UiCard>
   </section>
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Plus, Save } from "@lucide/vue";
+import { Plus, Save, Sparkles } from "@lucide/vue";
 import FormField from "../components/FormField.vue";
 import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
@@ -60,8 +91,17 @@ const store = useManagerStore();
 const selectedId = ref("");
 const draft = ref(null);
 const selectedFile = ref("");
+const aiFillOpen = ref(false);
+const aiFill = ref({
+  llm_profile: "",
+  instruction: "Generate concise, practical Markdown for the selected ZeroClaw prompt files. Preserve file roles and placeholders where useful. Return only the requested files.",
+  description: "",
+  files: [],
+  reference_files: []
+});
 
 const fileNames = computed(() => Object.keys(draft.value?.files || {}));
+const llmOptions = computed(() => store.profiles.llm.map((profile) => ({ label: itemId(profile), value: itemId(profile) })));
 
 watch(
   () => store.templates,
@@ -75,6 +115,7 @@ function selectTemplate(template) {
   selectedId.value = itemId(template);
   draft.value = clone(template);
   selectedFile.value = Object.keys(draft.value.files || {})[0] || "";
+  resetAiFill();
 }
 
 function createTemplate() {
@@ -82,6 +123,7 @@ function createTemplate() {
   draft.value = { id: `template-${next}`, description: "", files: { "AGENTS.md": "" }, _draft: true };
   selectedId.value = "";
   selectedFile.value = "AGENTS.md";
+  resetAiFill();
 }
 
 async function save() {
@@ -99,5 +141,35 @@ function addFile() {
   if (!draft.value.files) draft.value.files = {};
   if (!(name in draft.value.files)) draft.value.files[name] = "";
   selectedFile.value = name;
+  if (!aiFill.value.files.includes(name)) aiFill.value.files.push(name);
+}
+
+function resetAiFill() {
+  const files = Object.keys(draft.value?.files || {});
+  aiFill.value = {
+    llm_profile: store.profiles.llm[0] ? itemId(store.profiles.llm[0]) : "",
+    instruction: aiFill.value.instruction,
+    description: draft.value?.description || "",
+    files: files.slice(0, Math.min(files.length, 3)),
+    reference_files: []
+  };
+}
+
+async function runAiFill() {
+  const currentFiles = Object.fromEntries(
+    [...new Set([...aiFill.value.files, ...aiFill.value.reference_files])].map((file) => [file, draft.value.files?.[file] || ""])
+  );
+  const result = await store.aiFillTemplate({
+    llm_profile: aiFill.value.llm_profile,
+    instruction: aiFill.value.instruction,
+    description: aiFill.value.description,
+    files: aiFill.value.files,
+    reference_files: aiFill.value.reference_files,
+    current_files: currentFiles
+  });
+  for (const [file, content] of Object.entries(result.files || {})) {
+    draft.value.files[file] = content;
+    selectedFile.value = file;
+  }
 }
 </script>

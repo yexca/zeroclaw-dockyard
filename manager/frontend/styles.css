@@ -58,6 +58,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 svg {
   width: 16px;
   height: 16px;
@@ -522,6 +527,16 @@ mark.bad {
   background: var(--panel-subtle);
 }
 
+.page-tabs {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.tab-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .segment-tabs button {
   flex: 1;
   min-height: 30px;
@@ -602,6 +617,32 @@ mark.bad {
   color: var(--muted);
 }
 
+.nested-form {
+  margin-top: 12px;
+}
+
+.file-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-chip {
+  width: fit-content;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-subtle);
+  color: var(--text);
+}
+
+.skill-library-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
 @media (max-width: 1080px) {
   .app-frame {
     grid-template-columns: 1fr;
@@ -620,6 +661,7 @@ mark.bad {
 
   .editor-layout,
   .agent-workbench,
+  .skill-library-layout,
   .split-panels,
   .metric-grid {
     grid-template-columns: 1fr;

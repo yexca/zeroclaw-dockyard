@@ -178,6 +178,11 @@ export const useManagerStore = defineStore("manager", {
       await this.loadConfig();
       this.setNotice(`Prompt template ${id} saved.`);
     },
+    async aiFillTemplate(payload) {
+      const result = await api("/api/prompt-templates/ai-fill", { method: "POST", body: payload });
+      this.setNotice("AI fill completed.");
+      return result;
+    },
     async saveSkillBundle(bundle) {
       const id = itemId(bundle);
       const exists = this.skillBundles.some((item) => itemId(item) === id);
@@ -191,6 +196,35 @@ export const useManagerStore = defineStore("manager", {
       await api(`/api/skills/bundles/${encodeURIComponent(id)}`, { method: "DELETE" });
       await this.loadConfig();
       this.setNotice(`Skill bundle ${id} deleted.`);
+    },
+    async listSkills(bundleId) {
+      return api(`/api/skills/bundles/${encodeURIComponent(bundleId)}/skills`);
+    },
+    async readSkill(bundleId, skillName) {
+      return api(`/api/skills/bundles/${encodeURIComponent(bundleId)}/skills/${encodeURIComponent(skillName)}`);
+    },
+    async saveSkill(bundleId, skillName, payload) {
+      const result = await api(`/api/skills/bundles/${encodeURIComponent(bundleId)}/skills/${encodeURIComponent(skillName)}`, {
+        method: "PUT",
+        body: payload
+      });
+      this.setNotice(`Skill ${skillName} saved.`);
+      return result;
+    },
+    async createSkill(bundleId, payload) {
+      const result = await api(`/api/skills/bundles/${encodeURIComponent(bundleId)}/skills`, {
+        method: "POST",
+        body: payload
+      });
+      this.setNotice(`Skill ${payload.name || payload.id} created.`);
+      return result;
+    },
+    async deleteSkill(bundleId, skillName) {
+      const result = await api(`/api/skills/bundles/${encodeURIComponent(bundleId)}/skills/${encodeURIComponent(skillName)}`, {
+        method: "DELETE"
+      });
+      this.setNotice(`Skill ${skillName} archived.`);
+      return result;
     },
     async loadDashboard() {
       this.dashboard = await api("/api/dashboard");

@@ -27,11 +27,43 @@
           <FormField v-model="draft.image" label="Docker image" wide />
           <FormField v-model="externalPeers" label="External peers" textarea wide />
           <FormField v-model="skillBundles" label="Skill bundles" textarea wide />
+          <details class="advanced-disclosure form-field--wide">
+            <summary>Advanced agent settings</summary>
+            <div class="form-grid nested-form">
+              <label class="check-row form-field--wide">
+                <input v-model="draft.enabled" type="checkbox" />
+                <span>Enabled</span>
+              </label>
+              <FormField v-model="draft.template_apply_mode" label="Template apply mode" :options="templateModeOptions" />
+              <FormField v-model="draft.storage_driver" label="Storage driver override" :options="storageOptions" />
+              <FormField v-model="draft.container_name" label="Container name override" />
+              <FormField v-model="envOverrides" label="Environment overrides" textarea wide />
+            </div>
+          </details>
+          <details class="advanced-disclosure form-field--wide">
+            <summary>Proactive sidecar</summary>
+            <div class="form-grid nested-form">
+              <label class="check-row form-field--wide">
+                <input v-model="proactive.enabled" type="checkbox" />
+                <span>Enabled</span>
+              </label>
+              <FormField v-model="proactive.target" label="Target" />
+              <FormField v-model="proactive.channel" label="Channel" />
+              <FormField v-model="proactive.timezone" label="Timezone" />
+              <FormField v-model="proactive.quiet_hours" label="Quiet hours" />
+              <FormField v-model="proactive.random_min_minutes" label="Random min minutes" type="number" />
+              <FormField v-model="proactive.random_max_minutes" label="Random max minutes" type="number" />
+              <FormField v-model="proactive.poll_seconds" label="Poll seconds" type="number" />
+              <FormField v-model="proactive.agent_url" label="Gateway URL override" />
+              <FormField v-model="proactive.prompt" label="Wake prompt" textarea wide />
+            </div>
+          </details>
           <div class="button-row form-field--wide">
             <UiButton variant="primary" type="submit"><Save />Save</UiButton>
             <UiButton v-if="!draft._draft" @click="store.controlAgent(draft.id, 'start')"><Play />Start</UiButton>
             <UiButton v-if="!draft._draft" @click="store.controlAgent(draft.id, 'stop')"><Square />Stop</UiButton>
             <UiButton v-if="!draft._draft" @click="store.controlAgent(draft.id, 'restart')"><RotateCw />Restart</UiButton>
+            <UiButton v-if="!draft._draft" variant="danger" @click="resetMatrix"><RefreshCcw />Reset Matrix</UiButton>
             <UiButton v-if="!draft._draft" variant="danger" @click="remove"><Trash2 />Delete</UiButton>
           </div>
         </form>
@@ -81,6 +113,7 @@ import {
   FileCode2,
   Plus,
   Play,
+  RefreshCcw,
   RotateCw,
   Save,
   ScrollText,
@@ -103,6 +136,17 @@ const runtimeTabs = ["status", "logs", "preview"];
 const runtimeStatus = ref(null);
 const runtimeLogs = ref(null);
 const runtimePreview = ref(null);
+const templateModeOptions = [
+  { label: "Keep existing files", value: "keep" },
+  { label: "Only missing files", value: "missing" },
+  { label: "Overwrite files", value: "overwrite" },
+  { label: "Merge files", value: "merge" }
+];
+const storageOptions = [
+  { label: "Use manager default", value: "" },
+  { label: "Volume", value: "volume" },
+  { label: "Bind", value: "bind" }
+];
 
 watch(
   () => store.agents,
@@ -125,6 +169,33 @@ const externalPeers = computed({
 const skillBundles = computed({
   get: () => (draft.value?.skill_bundles || []).join("\n"),
   set: (value) => (draft.value.skill_bundles = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))
+});
+
+const envOverrides = computed({
+  get: () => {
+    const env = draft.value?.environment || draft.value?.env || {};
+    return Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n");
+  },
+  set: (value) => {
+    draft.value.environment = Object.fromEntries(
+      value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const index = line.indexOf("=");
+          return index >= 0 ? [line.slice(0, index).trim(), line.slice(index + 1)] : [line, ""];
+        })
+    );
+  }
+});
+
+const proactive = computed({
+  get: () => {
+    if (!draft.value.proactive) draft.value.proactive = {};
+    return draft.value.proactive;
+  },
+  set: (value) => (draft.value.proactive = value)
 });
 
 const templateOptions = computed(() => [
@@ -211,5 +282,10 @@ async function loadEnv() {
 async function runAgentAction(action) {
   runtimePreview.value = await store.agentAction(draft.value.id, action);
   runtimeTab.value = "preview";
+}
+
+async function resetMatrix() {
+  if (!confirm(`Reset Matrix E2EE state for ${draft.value.id}? The agent must be stopped.`)) return;
+  await runAgentAction("reset-matrix-state");
 }
 </script>
