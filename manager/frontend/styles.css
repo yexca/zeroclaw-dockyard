@@ -333,6 +333,60 @@ svg {
   padding: 0;
 }
 
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(0 0 0 / 0.42);
+}
+
+.dialog-panel {
+  width: min(440px, 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.dialog-header,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.dialog-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.dialog-message {
+  margin: 0;
+  padding: 16px 16px 0;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dialog-form {
+  padding: 14px 16px 0;
+}
+
+.dialog-actions {
+  justify-content: end;
+}
+
 .editor-layout {
   display: grid;
   grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);

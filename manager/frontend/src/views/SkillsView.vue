@@ -129,12 +129,14 @@ import FormField from "../components/FormField.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { clone } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const skills = reactive({});
 const bundles = computed(() => store.skillBundles);
 const selectedTab = ref("runtime");
@@ -222,7 +224,7 @@ async function saveBundle() {
 }
 
 async function deleteBundle() {
-  if (bundleDraft.value && confirm(t("confirm.deleteSkillBundleNamed", { id: bundleDraft.value.id }))) {
+  if (bundleDraft.value && await dialog.confirm(t("confirm.deleteSkillBundleNamed", { id: bundleDraft.value.id }))) {
     await store.deleteSkillBundle(bundleDraft.value.id);
     bundleDraft.value = null;
     selectedBundleId.value = "";
@@ -286,7 +288,7 @@ async function saveSkillDoc() {
 }
 
 async function deleteSkillDoc() {
-  if (!selectedSkillName.value || !confirm(t("confirm.archiveSkillNamed", { name: selectedSkillName.value }))) return;
+  if (!selectedSkillName.value || !(await dialog.confirm(t("confirm.archiveSkillNamed", { name: selectedSkillName.value })))) return;
   await store.deleteSkill(selectedBundleId.value, selectedSkillName.value);
   selectedSkillName.value = "";
   skillDraft.value = null;
@@ -320,7 +322,7 @@ async function saveSupportFile() {
 }
 
 async function deleteSupportFile() {
-  if (!supportFilePath.value || !confirm(t("confirm.deleteSkillFileNamed", { path: supportFilePath.value }))) return;
+  if (!supportFilePath.value || !(await dialog.confirm(t("confirm.deleteSkillFileNamed", { path: supportFilePath.value })))) return;
   await store.deleteSupportFile(selectedBundleId.value, selectedSkillName.value, supportFilePath.value);
   supportFilePath.value = "";
   supportFileContent.value = "";

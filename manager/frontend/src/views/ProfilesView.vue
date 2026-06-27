@@ -152,6 +152,7 @@ import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
@@ -159,6 +160,7 @@ import { useManagerStore } from "../stores/manager.js";
 const route = useRoute();
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const selectedId = ref("");
 const draft = ref(null);
 const testResult = ref(null);
@@ -217,7 +219,7 @@ async function save() {
 }
 
 async function remove() {
-  if (!draft.value?._draft && confirm(t("confirm.deleteProfileNamed", { kind: t(`${kind.value}.title`), id: itemId(draft.value) }))) {
+  if (!draft.value?._draft && await dialog.confirm(t("confirm.deleteProfileNamed", { kind: t(`${kind.value}.title`), id: itemId(draft.value) }))) {
     await store.deleteProfile(kind.value, itemId(draft.value));
     draft.value = null;
     selectedId.value = "";

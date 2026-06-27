@@ -49,6 +49,7 @@
 
       <RouterView />
     </main>
+    <DialogHost />
   </div>
 </template>
 
@@ -70,6 +71,7 @@ import {
   Sparkles
 } from "@lucide/vue";
 import UiButton from "./components/UiButton.vue";
+import DialogHost from "./components/DialogHost.vue";
 import { useI18n } from "./composables/useI18n.js";
 import { useManagerStore } from "./stores/manager.js";
 import { applyThemeMode, normalizeThemeMode } from "./theme-core.mjs";

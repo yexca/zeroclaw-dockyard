@@ -47,11 +47,13 @@ import { RefreshCw } from "@lucide/vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const lastResult = ref(null);
 const buckets = [
   { id: "expected", labelKey: "resources.expected" },
@@ -105,14 +107,14 @@ async function runAction(action, kind, row, extra = {}) {
 }
 
 async function migrate(kind, row) {
-  const target_name = prompt(t("resources.migrateTargetPrompt"), `${resourceName(row)}-migrated`);
+  const target_name = await dialog.prompt(t("resources.migrateTargetPrompt"), `${resourceName(row)}-migrated`);
   if (!target_name) return;
   await runAction("migrate", kind, row, { target_name });
 }
 
 async function deleteResource(kind, row) {
   const name = resourceName(row);
-  const typed = prompt(t("resources.deleteTypeName", { name, kind: t(`resourceKinds.${kind}`) }));
+  const typed = await dialog.prompt(t("resources.deleteTypeName", { name, kind: t(`resourceKinds.${kind}`) }));
   if (typed !== name) return;
   await runAction("delete", kind, row);
 }

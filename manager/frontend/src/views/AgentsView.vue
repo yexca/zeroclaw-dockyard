@@ -140,12 +140,14 @@ import FormField from "../components/FormField.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const selectedId = ref("");
 const draft = ref(null);
 const runtimeTab = ref("status");
@@ -278,7 +280,7 @@ async function save() {
 }
 
 async function remove() {
-  if (!draft.value?._draft && confirm(t("confirm.deleteAgentNamed", { id: draft.value.id }))) {
+  if (!draft.value?._draft && await dialog.confirm(t("confirm.deleteAgentNamed", { id: draft.value.id }))) {
     await store.deleteAgent(draft.value.id);
     draft.value = null;
     selectedId.value = "";
@@ -354,7 +356,7 @@ function downloadLogs() {
 }
 
 async function resetMatrix() {
-  if (!confirm(t("confirm.resetMatrixStateNamed", { id: draft.value.id }))) return;
+  if (!(await dialog.confirm(t("confirm.resetMatrixStateNamed", { id: draft.value.id })))) return;
   await runAgentAction("reset-matrix-state");
 }
 

@@ -97,12 +97,14 @@ import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md"];
 const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", "PROACTIVE.md"];
 const selectedId = ref("");
@@ -164,17 +166,17 @@ async function save() {
 }
 
 async function deleteTemplate() {
-  if (!draft.value || !confirm(t("confirm.deleteTemplateNamed", { id: itemId(draft.value) }))) return;
+  if (!draft.value || !(await dialog.confirm(t("confirm.deleteTemplateNamed", { id: itemId(draft.value) })))) return;
   await store.deleteTemplate(itemId(draft.value));
   draft.value = null;
   selectedId.value = "";
   selectedFile.value = "";
 }
 
-function addFile() {
-  const name = prompt(t("prompts.addFilePrompt"), "USER.md");
+async function addFile() {
+  const name = await dialog.prompt(t("prompts.addFilePrompt"), "USER.md");
   if (!name) return;
-  const normalized = validateFilename(name);
+  const normalized = await validateFilename(name);
   if (!normalized) return;
   if (!draft.value.files) draft.value.files = {};
   if (!(normalized in draft.value.files)) draft.value.files[normalized] = "";
@@ -182,15 +184,15 @@ function addFile() {
   if (!aiFill.value.files.includes(normalized)) aiFill.value.files.push(normalized);
 }
 
-function renameFile() {
+async function renameFile() {
   if (!selectedFile.value) return;
-  const next = prompt(t("prompts.renameFilePrompt"), selectedFile.value);
+  const next = await dialog.prompt(t("prompts.renameFilePrompt"), selectedFile.value);
   if (!next) return;
-  const normalized = validateFilename(next);
+  const normalized = await validateFilename(next);
   if (!normalized) return;
   if (normalized === selectedFile.value) return;
   if (draft.value.files?.[normalized] !== undefined) {
-    alert(t("prompts.fileExists"));
+    await dialog.alert(t("prompts.fileExists"));
     return;
   }
   draft.value.files[normalized] = draft.value.files[selectedFile.value] || "";
@@ -199,9 +201,9 @@ function renameFile() {
   resetAiFill();
 }
 
-function deleteFile() {
+async function deleteFile() {
   if (!selectedFile.value || protectedFile(selectedFile.value)) return;
-  if (!confirm(t("confirm.deleteTemplateFileNamed", { file: selectedFile.value }))) return;
+  if (!(await dialog.confirm(t("confirm.deleteTemplateFileNamed", { file: selectedFile.value })))) return;
   delete draft.value.files[selectedFile.value];
   selectedFile.value = Object.keys(draft.value.files || {})[0] || "";
   resetAiFill();
@@ -263,11 +265,11 @@ function normalizeTemplateFilename(value) {
   return filename;
 }
 
-function validateFilename(value) {
+async function validateFilename(value) {
   try {
     return normalizeTemplateFilename(value);
   } catch (error) {
-    alert(t("prompts.invalidFileName"));
+    await dialog.alert(t("prompts.invalidFileName"));
     return "";
   }
 }

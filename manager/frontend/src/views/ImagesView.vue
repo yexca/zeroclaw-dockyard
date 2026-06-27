@@ -40,11 +40,13 @@ import { Download, Hammer, RefreshCw, ShieldAlert } from "@lucide/vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
 const { t } = useI18n();
+const dialog = useDialog();
 const rows = computed(() => store.images?.images || store.images?.rows || []);
 const lastResult = ref(null);
 
@@ -53,7 +55,7 @@ async function runImageAction(action, extra = {}) {
 }
 
 async function runBuild(action) {
-  const ok = confirm(t(action === "build-root" ? "confirm.buildRootImage" : "confirm.buildPythonImage"));
+  const ok = await dialog.confirm(t(action === "build-root" ? "confirm.buildRootImage" : "confirm.buildPythonImage"));
   if (!ok) return;
   await runImageAction(action, { acknowledge_risk: true });
 }
