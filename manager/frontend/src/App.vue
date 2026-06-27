@@ -54,8 +54,8 @@ import {
   FileArchive,
   FileText,
   Gauge,
-  Image,
   Network,
+  Package,
   Plug,
   RefreshCw,
   Settings2,
@@ -77,8 +77,8 @@ const navItems = [
   { to: "/profiles/mcp", label: "MCP", icon: Plug },
   { to: "/skills", label: "Skills", icon: Boxes },
   { to: "/prompts", label: "Prompts", icon: FileText },
-  { to: "/images", label: "Images", icon: Image },
-  { to: "/resources", label: "Resources", icon: Settings2 },
+  { to: "/images", label: "Docker Images", icon: Package },
+  { to: "/resources", label: "Docker Resources", icon: Settings2 },
   { to: "/export", label: "Export", icon: FileArchive }
 ];
 

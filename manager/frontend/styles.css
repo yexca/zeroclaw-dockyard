@@ -664,6 +664,40 @@ mark.bad {
   overflow: auto;
 }
 
+.resource-buckets {
+  display: grid;
+  gap: 10px;
+}
+
+.resource-row-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.resource-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+}
+
+.resource-card strong,
+.resource-card span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.resource-card span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 @media (max-width: 1080px) {
   .app-frame {
     grid-template-columns: 1fr;

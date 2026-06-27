@@ -264,8 +264,31 @@ export const useManagerStore = defineStore("manager", {
     async loadImages() {
       this.images = await api("/api/docker/images");
     },
+    async imageAction(action, extra = {}) {
+      const result = await api("/api/docker/images/action", {
+        method: "POST",
+        body: { action, ...extra }
+      });
+      this.setNotice(`Image action ${action} completed.`);
+      await this.loadImages();
+      return result;
+    },
     async loadResources() {
       this.resources = await api("/api/docker/resources");
+    },
+    async resourceAction(action, resource, extra = {}) {
+      const result = await api("/api/docker/resources/action", {
+        method: "POST",
+        body: {
+          action,
+          kind: resource.kind,
+          name: resource.name,
+          ...extra
+        }
+      });
+      this.setNotice(`Resource action ${action} completed.`);
+      await this.loadResources();
+      return result;
     },
     async exportConfig(includeSecrets = false) {
       const result = await api("/api/export", { method: "POST", body: { include_secrets: includeSecrets } });
