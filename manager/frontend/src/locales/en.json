@@ -20,6 +20,11 @@
       "system": "System"
     }
   },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {page} of {pages}"
+  },
   "nav": {
     "label": "Management sections",
     "dashboard": "Dashboard",
@@ -63,13 +68,27 @@
     "runtimeRows": "Agents",
     "runtimeRowsHelp": "Docker-backed rows appear after workspace initialization.",
     "noRuntimeRows": "No runtime rows loaded yet.",
+    "uninitialized": "{count} configured agents need a workspace template before they appear here.",
+    "emptyGroup": "No agents in this group.",
+    "recentLogs": "Recent logs",
+    "recentLogsHelp": "Short tails from agents that are running or need attention.",
     "validation": "Validation",
     "validateConfig": "Validate config",
     "metrics": {
       "configuredAgents": "Configured agents",
       "runningAgents": "Running agents",
       "profiles": "Profiles",
-      "skillBundles": "Skill bundles"
+      "skillBundles": "Skill bundles",
+      "needsAttention": "Needs attention",
+      "needsRebuild": "Needs rebuild"
+    },
+    "groups": {
+      "attention": "Needs attention",
+      "attentionHelp": "Errors, unhealthy containers, missing containers, or rebuild-needed agents.",
+      "running": "Running",
+      "runningHelp": "Agents currently up or restarting.",
+      "stopped": "Stopped",
+      "stoppedHelp": "Configured runtime rows that are not running."
     },
     "table": {
       "agent": "Agent",

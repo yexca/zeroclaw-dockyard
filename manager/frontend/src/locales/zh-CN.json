@@ -20,6 +20,11 @@
       "system": "跟随系统"
     }
   },
+  "pagination": {
+    "previous": "上一页",
+    "next": "下一页",
+    "pageOf": "第 {page} / {pages} 页"
+  },
   "nav": {
     "label": "管理区域",
     "dashboard": "仪表盘",
@@ -63,13 +68,27 @@
     "runtimeRows": "智能体",
     "runtimeRowsHelp": "初始化工作区后会显示 Docker 运行行。",
     "noRuntimeRows": "尚未加载运行行。",
+    "uninitialized": "{count} 个已配置智能体需要先应用工作区模板。",
+    "emptyGroup": "这一组暂时没有智能体。",
+    "recentLogs": "最近日志",
+    "recentLogsHelp": "运行中或需要关注的智能体日志摘要。",
     "validation": "校验",
     "validateConfig": "校验配置",
     "metrics": {
       "configuredAgents": "已配置智能体",
       "runningAgents": "运行中智能体",
       "profiles": "配置",
-      "skillBundles": "技能包"
+      "skillBundles": "技能包",
+      "needsAttention": "需要关注",
+      "needsRebuild": "需要重建"
+    },
+    "groups": {
+      "attention": "需要关注",
+      "attentionHelp": "错误、不健康、缺失容器或需要重建的智能体。",
+      "running": "运行中",
+      "runningHelp": "正在运行或重启中的智能体。",
+      "stopped": "已停止",
+      "stoppedHelp": "已初始化但当前未运行的智能体。"
     },
     "table": {
       "agent": "智能体",

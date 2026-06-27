@@ -1,5 +1,5 @@
 <template>
-  <button class="ui-button" :class="[`ui-button--${variant}`, { 'ui-button--icon': icon }]" :type="type">
+  <button class="ui-button" :class="[`ui-button--${variant}`, { 'ui-button--icon': icon }]" :type="type" v-bind="$attrs">
     <slot />
   </button>
 </template>

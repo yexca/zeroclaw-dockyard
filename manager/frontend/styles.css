@@ -589,6 +589,92 @@ textarea[aria-invalid="true"] {
   margin-top: 12px;
 }
 
+.runtime-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-chip-list,
+.history-list,
+.log-summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-status-chip,
+.history-row,
+.log-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.history-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.agent-status-chip {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.agent-status-chip small,
+.history-row small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.log-summary-row {
+  grid-template-columns: 110px minmax(0, 1fr);
+}
+
+.log-summary-row pre {
+  overflow: auto;
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.pagination-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--muted);
+}
+
+.inline-warning {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger);
+}
+
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.icon-link svg {
+  width: 16px;
+  height: 16px;
+}
+
 mark {
   display: inline-flex;
   width: fit-content;
@@ -919,6 +1005,7 @@ mark.bad {
   .skill-library-layout,
   .support-file-layout,
   .split-panels,
+  .runtime-groups,
   .metric-grid {
     grid-template-columns: 1fr;
   }
