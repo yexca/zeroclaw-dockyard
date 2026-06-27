@@ -119,6 +119,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import {
   Activity,
   ArrowDownToLine,
@@ -145,8 +146,10 @@ import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { firstError, validateHttpUrl, validateId, validateIntegerRange, validateRequired, valueExists } from "../lib/validation.js";
+import { issueMessages, mapIssuesToAgentForm, validationIssuesFromError } from "../lib/validationIssues.mjs";
 import { useManagerStore } from "../stores/manager.js";
 
+const route = useRoute();
 const store = useManagerStore();
 const { t } = useI18n();
 const dialog = useDialog();
@@ -203,9 +206,22 @@ const imagePreset = computed({
 watch(
   () => store.agents,
   (agents) => {
+    const routeAgent = String(route.query.agent || "");
+    if (routeAgent && agents.some((agent) => itemId(agent) === routeAgent) && selectedId.value !== routeAgent) {
+      selectAgent(agents.find((agent) => itemId(agent) === routeAgent));
+      return;
+    }
     if (!draft.value && agents.length) selectAgent(agents[0]);
   },
   { immediate: true }
+);
+
+watch(
+  () => route.query.agent,
+  (agentId) => {
+    const agent = store.agents.find((item) => itemId(item) === String(agentId || ""));
+    if (agent) selectAgent(agent);
+  }
 );
 
 const externalPeers = computed({
@@ -290,8 +306,20 @@ async function save() {
     formErrors.value = {};
     formMessage.value = "";
   } catch (error) {
-    formMessage.value = error.message || String(error);
+    applyBackendValidation(error, payload.id);
   }
+}
+
+function applyBackendValidation(error, agentId) {
+  const issues = validationIssuesFromError(error);
+  if (!issues.length) {
+    formMessage.value = error.message || String(error);
+    return;
+  }
+  const mapped = mapIssuesToAgentForm(issues, agentId);
+  formErrors.value = { ...formErrors.value, ...mapped.errors };
+  const messages = issueMessages(mapped.global);
+  formMessage.value = messages.length ? messages.join(" ") : t("validation.fixFields");
 }
 
 function validateAgentForm() {

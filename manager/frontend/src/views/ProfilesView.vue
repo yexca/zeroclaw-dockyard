@@ -45,7 +45,7 @@
             <FormField v-model="draft.provider_alias" :label="t('fields.providerAlias')" :error="formErrors.provider_alias" required />
             <FormField v-model="draft.model" :label="t('fields.model')" :error="formErrors.model" required />
             <FormField v-model="draft.base_url" :label="t('fields.baseUrl')" :error="formErrors.base_url" />
-            <FormField v-model="draft.api_key" :label="t('fields.apiKey')" type="password" />
+            <FormField v-model="draft.api_key" :label="t('fields.apiKey')" type="password" :error="formErrors.api_key" />
             <FormField v-model="draft.wire_api" :label="t('fields.wireApi')" :options="wireOptions" />
             <FormField v-model="draft.timeout_secs" :label="t('fields.timeout')" type="number" min="1" :error="formErrors.timeout_secs" />
             <template v-if="kind === 'vision'">
@@ -88,7 +88,7 @@
             <FormField v-model="draft.homeserver" :label="t('fields.homeserver')" :error="formErrors.homeserver" required />
             <FormField v-model="draft.user_id" :label="t('fields.matrixUser')" :error="formErrors.user_id" required />
             <FormField v-model="draft.device_id" :label="t('fields.deviceId')" />
-            <FormField v-model="draft.password" :label="t('fields.password')" type="password" />
+            <FormField v-model="draft.password" :label="t('fields.password')" type="password" :error="formErrors.password" />
             <FormField v-model="draft.recovery_key" :label="t('fields.recoveryKey')" type="password" />
             <FormField v-model="allowedRooms" :label="t('fields.allowedRooms')" textarea wide />
             <details class="advanced-disclosure form-field--wide" open>
@@ -101,7 +101,7 @@
                 <FormField v-model="draft.stream_mode" :label="t('fields.streamMode')" :options="streamOptions" />
                 <FormField v-model="draft.multi_message_delay_ms" :label="t('fields.multiMessageDelayMs')" type="number" min="0" :error="formErrors.multi_message_delay_ms" />
                 <FormField v-model="draft.channel_debounce_ms" :label="t('fields.channelDebounceMs')" type="number" min="0" :error="formErrors.channel_debounce_ms" />
-                <FormField v-model="draft.access_token" :label="t('fields.accessToken')" type="password" wide />
+                <FormField v-model="draft.access_token" :label="t('fields.accessToken')" type="password" :error="formErrors.access_token" wide />
               </div>
             </details>
             <details class="advanced-disclosure form-field--wide">
@@ -166,6 +166,7 @@ import {
   validateSkillBundleId,
   valueExists
 } from "../lib/validation.js";
+import { issueMessages, mapIssuesToProfileForm, validationIssuesFromError } from "../lib/validationIssues.mjs";
 import { useManagerStore } from "../stores/manager.js";
 
 const route = useRoute();
@@ -207,9 +208,22 @@ watch(kind, () => {
 watch(
   profiles,
   (items) => {
+    const routeId = String(route.query.id || "");
+    if (routeId && items.some((profile) => itemId(profile) === routeId) && selectedId.value !== routeId) {
+      selectProfile(items.find((profile) => itemId(profile) === routeId));
+      return;
+    }
     if (!draft.value && items.length) selectProfile(items[0]);
   },
   { immediate: true }
+);
+
+watch(
+  () => route.query.id,
+  (profileId) => {
+    const profile = profiles.value.find((item) => itemId(item) === String(profileId || ""));
+    if (profile) selectProfile(profile);
+  }
 );
 
 function selectProfile(profile) {
@@ -241,8 +255,20 @@ async function save() {
     formErrors.value = {};
     formMessage.value = "";
   } catch (error) {
-    formMessage.value = error.message || String(error);
+    applyBackendValidation(error, itemId(payload));
   }
+}
+
+function applyBackendValidation(error, profileId) {
+  const issues = validationIssuesFromError(error);
+  if (!issues.length) {
+    formMessage.value = error.message || String(error);
+    return;
+  }
+  const mapped = mapIssuesToProfileForm(issues, kind.value, profileId, store.profiles);
+  formErrors.value = { ...formErrors.value, ...mapped.errors };
+  const messages = issueMessages(mapped.global);
+  formMessage.value = messages.length ? messages.join(" ") : t("validation.fixFields");
 }
 
 function validateProfileForm() {

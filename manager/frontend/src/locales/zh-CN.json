@@ -425,7 +425,14 @@
     "fixFields": "请先修正高亮字段再保存。",
     "invalidSupportPath": "{field} 必须位于选中的支持文件类型下，并使用安全路径片段。",
     "duplicateValue": "{field} 必须唯一。",
-    "unknownReference": "{field} 引用了不存在的项目。"
+    "unknownReference": "{field} 引用了不存在的项目。",
+    "errorCount": "{count} 个错误",
+    "warningCount": "{count} 个警告",
+    "rawResult": "原始结果"
+  },
+  "validationLevels": {
+    "error": "错误",
+    "warning": "警告"
   },
   "messages": {
     "saved": "已保存。",

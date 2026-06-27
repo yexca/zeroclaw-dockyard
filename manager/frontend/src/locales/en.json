@@ -481,7 +481,14 @@
     "fixFields": "Fix the highlighted fields before saving.",
     "invalidSupportPath": "{field} must stay inside the selected support file type and use safe path segments.",
     "duplicateValue": "{field} must be unique.",
-    "unknownReference": "{field} references an item that does not exist."
+    "unknownReference": "{field} references an item that does not exist.",
+    "errorCount": "{count} errors",
+    "warningCount": "{count} warnings",
+    "rawResult": "Raw result"
+  },
+  "validationLevels": {
+    "error": "Error",
+    "warning": "Warning"
   },
   "messages": {
     "saved": "Saved.",

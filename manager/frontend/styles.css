@@ -546,6 +546,49 @@ textarea[aria-invalid="true"] {
   text-transform: uppercase;
 }
 
+.validation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.issue-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.issue-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.issue-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.issue-link {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.raw-disclosure {
+  margin-top: 12px;
+}
+
 mark {
   display: inline-flex;
   width: fit-content;

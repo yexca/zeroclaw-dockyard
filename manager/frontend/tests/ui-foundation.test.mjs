@@ -28,6 +28,7 @@ assert.deepEqual(flattenKeys(zhCN).sort(), flattenKeys(en).sort(), "Locale files
 const themeCore = await import(pathToFileURL(resolve(frontendDir, "src/theme-core.mjs")));
 const i18n = await import(pathToFileURL(resolve(frontendDir, "src/i18n.mjs")));
 const preferences = await import(pathToFileURL(resolve(frontendDir, "src/preferences.mjs")));
+const validationIssues = await import(pathToFileURL(resolve(frontendDir, "src/lib/validationIssues.mjs")));
 const documentElement = { dataset: {}, style: {} };
 const darkMedia = (query) => ({ matches: query === "(prefers-color-scheme: dark)" });
 
@@ -53,5 +54,29 @@ const defaults = await preferences.loadDefaultPreferences(async () => ({
   }
 }));
 assert.deepEqual(defaults, { language: "zh-CN", theme: "dark" }, "WebUI defaults should load from API payload");
+
+const issues = validationIssues.validationIssuesFromResult({
+  errors: [
+    { code: "invalid_proactive_range", field: "agents.agent1.proactive.random_max_minutes", message: "Range failed." },
+    { code: "missing_matrix_external_peers", field: "agents.agent1.matrix.external_peers", message: "Peers missing." },
+    { code: "missing_vision_model", field: "profiles.vision[0].model", message: "Model missing." }
+  ],
+  warnings: [{ code: "missing_vision_api_key", field: "profiles.vision[0].api_key", message: "API key missing." }]
+});
+assert.deepEqual(
+  validationIssues.mapIssuesToAgentForm(issues, "agent1").errors,
+  { proactive_random_max_minutes: "Range failed.", external_peers: "Peers missing." },
+  "Agent backend validation paths should map to local form keys"
+);
+assert.deepEqual(
+  validationIssues.mapIssuesToProfileForm(issues, "vision", "vision-default", { vision: [{ id: "vision-default" }] }).errors,
+  { model: "Model missing." },
+  "Profile backend validation paths should map by collection index and selected id"
+);
+assert.deepEqual(
+  validationIssues.issueTarget({ field: "profiles.vision[0].model" }, { profiles: { vision: [{ id: "vision-default" }] } }),
+  { label: "vision-default", to: "/profiles/vision?id=vision-default" },
+  "Dashboard issue targets should point to the owning editor"
+);
 
 console.log("ui foundation tests passed");
