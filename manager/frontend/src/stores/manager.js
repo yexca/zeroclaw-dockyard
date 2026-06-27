@@ -186,6 +186,11 @@ export const useManagerStore = defineStore("manager", {
       await this.loadConfig();
       this.setNotice(`Prompt template ${id} saved.`);
     },
+    async deleteTemplate(id) {
+      await api(`/api/prompt-templates/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await this.loadConfig();
+      this.setNotice(`Prompt template ${id} deleted.`);
+    },
     async aiFillTemplate(payload) {
       const result = await api("/api/prompt-templates/ai-fill", { method: "POST", body: payload });
       this.setNotice("AI fill completed.");

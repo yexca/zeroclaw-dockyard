@@ -6,6 +6,9 @@
 
     <div class="editor-layout">
       <UiCard title="Templates">
+        <template #actions>
+          <UiButton v-if="draft" @click="duplicateTemplate"><Copy />Duplicate</UiButton>
+        </template>
         <div class="item-list">
           <button v-for="template in store.templates" :key="itemId(template)" :class="{ active: selectedId === itemId(template) }" @click="selectTemplate(template)">
             <strong>{{ itemId(template) }}</strong>
@@ -24,8 +27,17 @@
             <div class="file-tabs">
               <button v-for="file in fileNames" :key="file" :class="{ active: selectedFile === file }" type="button" @click="selectedFile = file">
                 {{ file }}
+                <small>{{ fileBadge(file) }}</small>
               </button>
               <button type="button" @click="addFile"><Plus />File</button>
+            </div>
+            <div v-if="selectedFile" class="template-file-meta">
+              <strong>{{ selectedFile }}</strong>
+              <span>{{ fileHelp(selectedFile) }}</span>
+              <div class="button-row">
+                <UiButton type="button" @click="renameFile"><Pencil />Rename</UiButton>
+                <UiButton type="button" variant="danger" :disabled="protectedFile(selectedFile)" @click="deleteFile"><Trash2 />Delete</UiButton>
+              </div>
             </div>
             <textarea v-if="selectedFile" v-model="draft.files[selectedFile]" class="template-editor-text" spellcheck="false" />
           </div>
@@ -38,6 +50,7 @@
           <div class="button-row form-field--wide">
             <UiButton variant="primary" type="submit"><Save />Save</UiButton>
             <UiButton type="button" @click="aiFillOpen = !aiFillOpen"><Sparkles />AI fill</UiButton>
+            <UiButton v-if="!draft._draft" type="button" variant="danger" @click="deleteTemplate"><Trash2 />Delete template</UiButton>
           </div>
         </form>
         <p v-else class="empty-text">Select or create a template.</p>
@@ -78,7 +91,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Plus, Save, Sparkles } from "@lucide/vue";
+import { Copy, Pencil, Plus, Save, Sparkles, Trash2 } from "@lucide/vue";
 import FormField from "../components/FormField.vue";
 import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
@@ -88,6 +101,8 @@ import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
+const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md"];
+const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", "PROACTIVE.md"];
 const selectedId = ref("");
 const draft = ref(null);
 const selectedFile = ref("");
@@ -126,6 +141,17 @@ function createTemplate() {
   resetAiFill();
 }
 
+function duplicateTemplate() {
+  if (!draft.value) return;
+  const copy = clone(draft.value);
+  copy.id = nextTemplateId(`${itemId(copy)}-copy`);
+  copy._draft = true;
+  selectedId.value = "";
+  draft.value = copy;
+  selectedFile.value = Object.keys(copy.files || {})[0] || "";
+  resetAiFill();
+}
+
 async function save() {
   const payload = clone(draft.value);
   payload.files = payload.files || {};
@@ -135,13 +161,48 @@ async function save() {
   draft.value = payload;
 }
 
+async function deleteTemplate() {
+  if (!draft.value || !confirm(`Delete template ${itemId(draft.value)}?`)) return;
+  await store.deleteTemplate(itemId(draft.value));
+  draft.value = null;
+  selectedId.value = "";
+  selectedFile.value = "";
+}
+
 function addFile() {
   const name = prompt("File name", "USER.md");
   if (!name) return;
+  const normalized = validateFilename(name);
+  if (!normalized) return;
   if (!draft.value.files) draft.value.files = {};
-  if (!(name in draft.value.files)) draft.value.files[name] = "";
-  selectedFile.value = name;
-  if (!aiFill.value.files.includes(name)) aiFill.value.files.push(name);
+  if (!(normalized in draft.value.files)) draft.value.files[normalized] = "";
+  selectedFile.value = normalized;
+  if (!aiFill.value.files.includes(normalized)) aiFill.value.files.push(normalized);
+}
+
+function renameFile() {
+  if (!selectedFile.value) return;
+  const next = prompt("New file name", selectedFile.value);
+  if (!next) return;
+  const normalized = validateFilename(next);
+  if (!normalized) return;
+  if (normalized === selectedFile.value) return;
+  if (draft.value.files?.[normalized] !== undefined) {
+    alert("A file with that name already exists.");
+    return;
+  }
+  draft.value.files[normalized] = draft.value.files[selectedFile.value] || "";
+  delete draft.value.files[selectedFile.value];
+  selectedFile.value = normalized;
+  resetAiFill();
+}
+
+function deleteFile() {
+  if (!selectedFile.value || protectedFile(selectedFile.value)) return;
+  if (!confirm(`Delete ${selectedFile.value}?`)) return;
+  delete draft.value.files[selectedFile.value];
+  selectedFile.value = Object.keys(draft.value.files || {})[0] || "";
+  resetAiFill();
 }
 
 function resetAiFill() {
@@ -171,5 +232,50 @@ async function runAiFill() {
     draft.value.files[file] = content;
     selectedFile.value = file;
   }
+}
+
+function protectedFile(file) {
+  return TEMPLATE_FILES.includes(file);
+}
+
+function fileBadge(file) {
+  const index = PROMPT_SYSTEM_FILES.indexOf(file);
+  if (index >= 0) return `read ${index + 1}`;
+  if (file === "HEARTBEAT.md") return "heartbeat";
+  if (file === "PROACTIVE.md") return "optional";
+  return "custom";
+}
+
+function fileHelp(file) {
+  if (PROMPT_SYSTEM_FILES.includes(file)) return "Official ZeroClaw prompt file injected in source-defined order.";
+  if (file === "HEARTBEAT.md") return "Read by the heartbeat worker, not injected into normal chat prompts.";
+  if (file === "PROACTIVE.md") return "Optional Dockyard proactive sidecar convention.";
+  return "Custom workspace file. Reference it from an official file when it should matter.";
+}
+
+function normalizeTemplateFilename(value) {
+  const filename = String(value || "").trim().replaceAll("\\", "/").split("/").pop();
+  if (!filename || !/^[A-Za-z0-9_.-]+$/.test(filename)) {
+    throw new Error("File names may use letters, numbers, dot, underscore, or hyphen.");
+  }
+  return filename;
+}
+
+function validateFilename(value) {
+  try {
+    return normalizeTemplateFilename(value);
+  } catch (error) {
+    alert(error.message || String(error));
+    return "";
+  }
+}
+
+function nextTemplateId(prefix) {
+  const taken = new Set(store.templates.map((template) => itemId(template)));
+  let base = String(prefix || "template").replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || "template";
+  let candidate = base;
+  let index = 2;
+  while (taken.has(candidate)) candidate = `${base}-${index++}`;
+  return candidate;
 }
 </script>

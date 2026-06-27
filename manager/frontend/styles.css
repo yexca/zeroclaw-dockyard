@@ -530,6 +530,18 @@ mark.bad {
   margin-bottom: 10px;
 }
 
+.inline-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.inline-select select {
+  width: auto;
+}
+
 .segment-tabs {
   display: flex;
   gap: 4px;
@@ -607,9 +619,33 @@ mark.bad {
   white-space: nowrap;
 }
 
+.file-tabs small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .file-tabs button.active {
   border-color: var(--primary);
   color: var(--text);
+}
+
+.template-file-meta {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-subtle);
+}
+
+.template-file-meta strong,
+.template-file-meta span {
+  display: block;
+}
+
+.template-file-meta span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .template-editor-text {

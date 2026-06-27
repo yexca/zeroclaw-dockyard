@@ -79,7 +79,13 @@
             <UiButton @click="loadEnv"><Braces />Env</UiButton>
           </div>
           <div class="runtime-actions">
-            <UiButton @click="runAgentAction('apply-template')"><FileCheck2 />Apply template</UiButton>
+            <label class="inline-select">
+              <span>Apply mode</span>
+              <select v-model="applyTemplateMode">
+                <option v-for="option in templateModeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </label>
+            <UiButton @click="applyTemplate"><FileCheck2 />Apply template</UiButton>
             <UiButton @click="runAgentAction('publish')"><Upload />Publish</UiButton>
             <UiButton @click="runAgentAction('sync-to-runtime')"><ArrowUpFromLine />Sync to runtime</UiButton>
             <UiButton @click="runAgentAction('sync-from-runtime')"><ArrowDownToLine />Sync from runtime</UiButton>
@@ -136,6 +142,7 @@ const runtimeTabs = ["status", "logs", "preview"];
 const runtimeStatus = ref(null);
 const runtimeLogs = ref(null);
 const runtimePreview = ref(null);
+const applyTemplateMode = ref("keep");
 const templateModeOptions = [
   { label: "Keep existing files", value: "keep" },
   { label: "Only missing files", value: "missing" },
@@ -281,6 +288,11 @@ async function loadEnv() {
 
 async function runAgentAction(action) {
   runtimePreview.value = await store.agentAction(draft.value.id, action);
+  runtimeTab.value = "preview";
+}
+
+async function applyTemplate() {
+  runtimePreview.value = await store.agentAction(draft.value.id, "apply-template", { mode: applyTemplateMode.value });
   runtimeTab.value = "preview";
 }
 
