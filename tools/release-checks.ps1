@@ -28,7 +28,6 @@ python -m unittest discover manager/backend/tests
 
 if (-not $SkipFrontend) {
   Write-Host "== Frontend tests =="
-  node --check manager/frontend/src/app.mjs
   node -e "JSON.parse(require('fs').readFileSync('manager/frontend/src/locales/en.json','utf8')); JSON.parse(require('fs').readFileSync('manager/frontend/src/locales/zh-CN.json','utf8'));"
   node manager/frontend/tests/ui-foundation.test.mjs
 }

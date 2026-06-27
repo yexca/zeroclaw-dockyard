@@ -57,9 +57,8 @@ Docker-backed status in the relevant views. The default first route is the
 Dashboard, with Agents, Profiles, Skills, Prompt Templates, Docker Images,
 Docker Resources, and Export exposed through Vue Router.
 
-The previous framework-free entry point, `manager/frontend/src/app.mjs`, is no
-longer part of startup. It remains in the tree as a migration reference until
-the team decides every legacy workflow has been fully replaced.
+The previous framework-free frontend entry point has been removed. Startup now
+uses the Vue/Vite application exclusively.
 
 ## Docker API Flow
 

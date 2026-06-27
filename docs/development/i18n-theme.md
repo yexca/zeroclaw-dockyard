@@ -1,27 +1,23 @@
 # I18n And Theme
 
-The frontend is now a Vue 3 application. Theme support is active in Vue, while
-i18n is in a migration state: the legacy JSON locale files and helpers still
-exist, but most Vue view labels are currently English literals.
+The frontend is a Vue 3 application. Theme support and i18n are active in the
+Vue shell and views.
 
 ## Locale Files
 
 - English: `manager/frontend/src/locales/en.json`
 - Simplified Chinese: `manager/frontend/src/locales/zh-CN.json`
 
-When extending the legacy locale set:
+When extending the locale set:
 
 1. Add the key to `en.json`.
 2. Add the same key to `zh-CN.json`.
-3. Wire the Vue code through the future i18n composable/store before depending
-   on the key in a view.
+3. Use `useI18n()` from Vue code instead of hard-coding user-facing text.
 4. Run `node manager/frontend/tests/ui-foundation.test.mjs`.
 
 The locale test asserts both files expose the same flattened key set.
 
-Do not assume `data-i18n` attributes are part of the current Vue rendering
-path. They belong to the legacy module app and are kept only for migration
-reference.
+The current rendering path uses the Vue i18n composable.
 
 ## Theme Modes
 

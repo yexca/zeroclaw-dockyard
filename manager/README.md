@@ -65,16 +65,13 @@ use `node:22-alpine`:
 docker run --rm -v "${PWD}:/work" -w /work/manager/frontend node:22-alpine sh -lc "npm ci && npm run build"
 ```
 
-The old framework-free module at `frontend/src/app.mjs` and the old
-`frontend/build.mjs` esbuild helper are retained only as migration references.
-Do not use either as the current app or build entry point. Remove them only
-after the Vue implementation has fully replaced every legacy workflow.
+The previous framework-free frontend and esbuild helper have been removed. Use
+the Vue/Vite entry points above for all current frontend work.
 
-Internationalization is mid-migration. The legacy structured JSON locale files
-remain under `frontend/src/locales/`, with English (`en`) as the default locale
-and Simplified Chinese (`zh-CN`) available. The current Vue views still contain
-hard-coded English labels in many places; future Vue i18n work should connect a
-small composable or store to these files before expanding locale coverage.
+Internationalization is wired through the Vue shell and views. Locale files
+live under `frontend/src/locales/`, with English (`en`) as the default locale
+and Simplified Chinese (`zh-CN`) available. Add matching keys to both locale
+files and use the local i18n composable from Vue code.
 
 Theme support is implemented through CSS custom properties and the
 `data-theme-mode` / `data-theme` attributes on `<html>`. Supported modes are
