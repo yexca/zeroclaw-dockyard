@@ -35,15 +35,19 @@
     "resources": "Docker Resources"
   },
   "images": {
-    "title": "Images",
+    "title": "Docker Images",
     "subtitle": "Inspect ZeroClaw runtime images, pull the official image, and build local advanced variants.",
     "official": "Official ZeroClaw",
     "python": "Python support",
     "root": "Root user",
     "custom": "Custom",
     "localImages": "Local image references",
+    "reference": "Reference",
     "present": "Present",
     "missing": "Missing",
+    "untagged": "untagged",
+    "empty": "No image data loaded.",
+    "lastAction": "Last image action",
     "shortId": "Image ID",
     "user": "User",
     "size": "Size",
@@ -55,7 +59,24 @@
     "empty": "No agents are configured yet.",
     "logsEmpty": "No logs loaded.",
     "tail": "Log lines",
-    "autoRefresh": "Auto-refresh"
+    "autoRefresh": "Auto-refresh",
+    "runtimeRows": "Agents",
+    "runtimeRowsHelp": "Docker-backed rows appear after workspace initialization.",
+    "noRuntimeRows": "No runtime rows loaded yet.",
+    "validation": "Validation",
+    "validateConfig": "Validate config",
+    "metrics": {
+      "configuredAgents": "Configured agents",
+      "runningAgents": "Running agents",
+      "profiles": "Profiles",
+      "skillBundles": "Skill bundles"
+    },
+    "table": {
+      "agent": "Agent",
+      "status": "Status",
+      "image": "Image",
+      "actions": "Actions"
+    }
   },
   "observability": {
     "containerId": "Container ID",
@@ -78,7 +99,29 @@
   "agents": {
     "title": "Agent Editor",
     "subtitle": "Create agents and wire reusable profiles. Matrix identity is edited in Matrix Profiles.",
-    "empty": "Create or select an agent to edit its settings."
+    "empty": "Create or select an agent to edit its settings.",
+    "newAgent": "New agent",
+    "list": "Agent list",
+    "listHelp": "Drafts become runnable after their prompt template is applied.",
+    "details": "Agent details",
+    "detailsHelp": "Core runtime and profile wiring.",
+    "unsaved": "New unsaved agent.",
+    "emptyList": "No agents yet.",
+    "noLlm": "No LLM",
+    "noMatrix": "No Matrix",
+    "agentId": "Agent ID",
+    "wakePrompt": "Wake prompt",
+    "runtime": "Runtime",
+    "runtimeHelp": "Status, logs, generated previews, and workspace actions.",
+    "applyMode": "Apply mode",
+    "saveBeforeRuntime": "Save the agent before using runtime actions.",
+    "noConfigPreview": "No config preview loaded.",
+    "noEnvPreview": "No env preview loaded.",
+    "noActionResult": "No action result loaded.",
+    "storage": {
+      "volume": "Volume",
+      "bind": "Bind"
+    }
   },
   "llm": {
     "title": "LLM Profiles",
@@ -102,7 +145,31 @@
   },
   "profiles": {
     "usedBy": "Used by",
-    "noUsage": "No agents use this profile."
+    "noUsage": "No agents use this profile.",
+    "title": "Profiles",
+    "profile": "Profile",
+    "newProfile": "New profile",
+    "listHelp": "Reusable settings assigned by agents.",
+    "emptyList": "No profiles yet.",
+    "details": "Profile details",
+    "detailsHelp": "Edit common fields directly; use JSON for advanced settings.",
+    "usedCount": "used {count}",
+    "agentCount": "{count} agent(s)",
+    "empty": "Select or create a profile.",
+    "llmAdvanced": "LLM advanced",
+    "matrixAdvanced": "Matrix advanced",
+    "advancedJson": "Advanced JSON",
+    "advancedJsonHelp": "Full object editor. Leave secret fields unchanged unless you intend to replace them.",
+    "testResult": "LLM test result",
+    "wire": {
+      "chatCompletions": "Chat Completions",
+      "responses": "Responses"
+    },
+    "stream": {
+      "multiMessage": "Multi message",
+      "edit": "Edit",
+      "disabled": "Disabled"
+    }
   },
   "skills": {
     "title": "Skills",
@@ -139,7 +206,21 @@
     "addTextFileSubtitle": "Create a UTF-8 text file under the selected support directory.",
     "uploadFileTitle": "Upload support file",
     "uploadFileSubtitle": "Upload a local text file into the selected support directory.",
-    "uploadTextOnlyNotice": "Uploads preserve the original file bytes. Text files can be edited after upload; binary files can be downloaded or replaced."
+    "uploadTextOnlyNotice": "Uploads preserve the original file bytes. Text files can be edited after upload; binary files can be downloaded or replaced.",
+    "saveSettings": "Save settings",
+    "bundle": "Bundle",
+    "skill": "Skill",
+    "saveBundle": "Save bundle",
+    "saveSkill": "Save skill",
+    "saveFile": "Save file",
+    "newTextFile": "New text file",
+    "noDescription": "No description",
+    "noSkillsLoaded": "No skills loaded for this bundle.",
+    "emptySkill": "Select or create a skill.",
+    "noFilesInType": "No files in {type}.",
+    "selectBundleSkillFirst": "Select a bundle and skill in Skill library first.",
+    "unableToPreview": "Unable to preview this file as UTF-8 text.\n\n{error}",
+    "newSkillContent": "# new-skill\n\nDescribe when and how to use this skill.\n"
   },
   "prompts": {
     "title": "Prompt Templates",
@@ -167,14 +248,32 @@
     "aiDescription": "Agent description",
     "aiDescriptionPlaceholder": "Describe who this agent is, what it does, preferences, relationship to the user, tone, boundaries, and useful context.",
     "aiGenerateFiles": "Files to generate",
-    "aiUseReferences": "Send selected current files to AI as reference context"
+    "aiUseReferences": "Send selected current files to AI as reference context",
+    "newTemplate": "New template",
+    "templates": "Templates",
+    "details": "Template details",
+    "detailsHelp": "Use JSON to preserve arbitrary prompt file mappings.",
+    "templateId": "Template ID",
+    "file": "File",
+    "rename": "Rename",
+    "deleteTemplate": "Delete template",
+    "fileCount": "{count} files",
+    "emptyList": "No templates yet.",
+    "targetFiles": "Target files",
+    "referenceFiles": "Reference files",
+    "renameFilePrompt": "New file name",
+    "fileExists": "A file with that name already exists.",
+    "invalidFileName": "File names may use letters, numbers, dot, underscore, or hyphen.",
+    "defaultAiInstruction": "Generate concise, practical Markdown for the selected ZeroClaw prompt files. Preserve file roles and placeholders where useful. Return only the requested files."
   },
   "export": {
     "title": "Config Export",
     "subtitle": "Inspect primary config, resolved config, and generated output preview.",
     "primary": "Primary config",
     "resolved": "Resolved config",
-    "generated": "Generated runtime preview"
+    "generated": "Generated runtime preview",
+    "options": "Export options",
+    "includeSecrets": "Include secrets in local backup"
   },
   "actions": {
     "create": "Create",
@@ -219,7 +318,9 @@
     "download": "Download",
     "copyPath": "Copy path",
     "openFolder": "Open folder",
-    "testConnection": "Test connection"
+    "testConnection": "Test connection",
+    "publish": "Publish",
+    "close": "Close"
   },
   "fields": {
     "id": "ID",
@@ -342,12 +443,16 @@
     "proactiveAgentUrl": "Gateway URL override",
     "proactivePrompt": "Proactive prompt",
     "uploadFile": "Upload file",
-    "supportUploadFile": "Upload file"
+    "supportUploadFile": "Upload file",
+    "storageDriver": "Storage driver override",
+    "containerName": "Container name override",
+    "command": "Command"
   },
   "templateApply": {
     "keep": "Keep existing files",
     "missing": "Write only missing files",
-    "overwrite": "Overwrite workspace files"
+    "overwrite": "Overwrite workspace files",
+    "merge": "Merge files"
   },
   "validation": {
     "valid": "Validation passed",
@@ -402,9 +507,17 @@
     "deleteTemplateFile": "Remove this custom template file?",
     "deleteSkillBundle": "Delete this skill bundle config? Skill files on disk are not removed.",
     "archiveSkill": "Archive this skill into shared/skills/_deleted?",
-    "deleteSkillFile": "Delete this support file?"
-    ,"buildPythonImage": "This will build a local ZeroClaw image with Python installed. Docker build can execute commands as root through the Docker daemon. Continue?",
-    "buildRootImage": "This will build a local ZeroClaw image that runs as root. Root containers can write files as root and increase runtime risk. Continue?"
+    "deleteSkillFile": "Delete this support file?",
+    "buildPythonImage": "This will build a local ZeroClaw image with Python installed. Docker build can execute commands as root through the Docker daemon. Continue?",
+    "buildRootImage": "This will build a local ZeroClaw image that runs as root. Root containers can write files as root and increase runtime risk. Continue?",
+    "deleteAgentNamed": "Delete agent {id}?",
+    "resetMatrixStateNamed": "Reset Matrix E2EE state for {id}? The agent must be stopped.",
+    "deleteProfileNamed": "Delete {kind} {id}?",
+    "deleteSkillBundleNamed": "Delete skill bundle {id}?",
+    "archiveSkillNamed": "Archive skill {name}?",
+    "deleteSkillFileNamed": "Delete {path}?",
+    "deleteTemplateNamed": "Delete template {id}?",
+    "deleteTemplateFileNamed": "Delete {file}?"
   },
   "common": {
     "loading": "Loading...",
@@ -559,7 +672,8 @@
     "reviewedHelp": "Mark reviewed only records a local decision in config/generated. It does not change Docker labels, rename resources, or migrate data.",
     "migrateTargetPrompt": "Target volume name",
     "deleteTitle": "Delete Docker resource",
-    "deleteTypeName": "Type the resource name to confirm deletion"
+    "deleteTypeName": "Type {name} to delete this {kind}.",
+    "lastAction": "Last resource action"
   },
   "resourceDeleteWarnings": {
     "container": "Deleting a container stops and removes that container, but it does not remove its volumes.",
@@ -599,5 +713,12 @@
     "running": "Running",
     "exited": "Stopped",
     "created": "Created"
+  },
+  "runtimeTabs": {
+    "status": "Status",
+    "logs": "Logs",
+    "config": "Config",
+    "env": "Env",
+    "result": "Result"
   }
 }

@@ -42,8 +42,12 @@
     "root": "Root 用户",
     "custom": "自定义",
     "localImages": "本地镜像引用",
+    "reference": "引用",
     "present": "已存在",
     "missing": "缺失",
+    "untagged": "未标记",
+    "empty": "尚未加载镜像数据。",
+    "lastAction": "上次镜像操作",
     "shortId": "镜像 ID",
     "user": "用户",
     "size": "大小",
@@ -55,7 +59,24 @@
     "empty": "还没有配置智能体。",
     "logsEmpty": "尚未加载日志。",
     "tail": "日志行数",
-    "autoRefresh": "自动刷新"
+    "autoRefresh": "自动刷新",
+    "runtimeRows": "智能体",
+    "runtimeRowsHelp": "初始化工作区后会显示 Docker 运行行。",
+    "noRuntimeRows": "尚未加载运行行。",
+    "validation": "校验",
+    "validateConfig": "校验配置",
+    "metrics": {
+      "configuredAgents": "已配置智能体",
+      "runningAgents": "运行中智能体",
+      "profiles": "配置",
+      "skillBundles": "技能包"
+    },
+    "table": {
+      "agent": "智能体",
+      "status": "状态",
+      "image": "镜像",
+      "actions": "操作"
+    }
   },
   "observability": {
     "containerId": "容器 ID",
@@ -78,7 +99,29 @@
   "agents": {
     "title": "智能体编辑器",
     "subtitle": "创建智能体并关联可复用配置。Matrix 身份信息在 Matrix 配置中编辑。",
-    "empty": "创建或选择一个智能体以编辑设置。"
+    "empty": "创建或选择一个智能体以编辑设置。",
+    "newAgent": "新建智能体",
+    "list": "智能体列表",
+    "listHelp": "应用提示词模板后，草稿才会变为可运行。",
+    "details": "智能体详情",
+    "detailsHelp": "核心运行时和配置关联。",
+    "unsaved": "新的未保存智能体。",
+    "emptyList": "还没有智能体。",
+    "noLlm": "未选择 LLM",
+    "noMatrix": "未选择 Matrix",
+    "agentId": "智能体 ID",
+    "wakePrompt": "唤醒提示",
+    "runtime": "运行时",
+    "runtimeHelp": "状态、日志、生成预览和工作区操作。",
+    "applyMode": "应用模式",
+    "saveBeforeRuntime": "保存智能体后才能使用运行时操作。",
+    "noConfigPreview": "尚未加载配置预览。",
+    "noEnvPreview": "尚未加载环境预览。",
+    "noActionResult": "尚未加载操作结果。",
+    "storage": {
+      "volume": "卷",
+      "bind": "绑定挂载"
+    }
   },
   "llm": {
     "title": "LLM 配置",
@@ -97,7 +140,31 @@
   },
   "profiles": {
     "usedBy": "被使用于",
-    "noUsage": "没有智能体使用这个配置。"
+    "noUsage": "没有智能体使用这个配置。",
+    "title": "配置",
+    "profile": "配置",
+    "newProfile": "新建配置",
+    "listHelp": "可分配给智能体的可复用设置。",
+    "emptyList": "还没有配置。",
+    "details": "配置详情",
+    "detailsHelp": "直接编辑常用字段；高级设置可使用 JSON。",
+    "usedCount": "使用中 {count}",
+    "agentCount": "{count} 个智能体",
+    "empty": "选择或创建一个配置。",
+    "llmAdvanced": "LLM 高级设置",
+    "matrixAdvanced": "Matrix 高级设置",
+    "advancedJson": "高级 JSON",
+    "advancedJsonHelp": "完整对象编辑器。除非要替换密钥字段，否则请保持其不变。",
+    "testResult": "LLM 测试结果",
+    "wire": {
+      "chatCompletions": "Chat Completions",
+      "responses": "Responses"
+    },
+    "stream": {
+      "multiMessage": "多消息",
+      "edit": "编辑",
+      "disabled": "禁用"
+    }
   },
   "prompts": {
     "title": "提示词模板",
@@ -125,14 +192,32 @@
     "aiDescription": "智能体描述",
     "aiDescriptionPlaceholder": "描述这个 agent 是谁、做什么、偏好、和用户的关系、语气、边界以及有用上下文。",
     "aiGenerateFiles": "要生成的文件",
-    "aiUseReferences": "将选中的当前文件发送给 AI 作为参考上下文"
+    "aiUseReferences": "将选中的当前文件发送给 AI 作为参考上下文",
+    "newTemplate": "新建模板",
+    "templates": "模板",
+    "details": "模板详情",
+    "detailsHelp": "使用 JSON 保留任意提示词文件映射。",
+    "templateId": "模板 ID",
+    "file": "文件",
+    "rename": "重命名",
+    "deleteTemplate": "删除模板",
+    "fileCount": "{count} 个文件",
+    "emptyList": "还没有模板。",
+    "targetFiles": "目标文件",
+    "referenceFiles": "参考文件",
+    "renameFilePrompt": "新文件名",
+    "fileExists": "同名文件已存在。",
+    "invalidFileName": "文件名只能使用字母、数字、点、下划线或连字符。",
+    "defaultAiInstruction": "为选中的 ZeroClaw 提示词文件生成简洁、实用的 Markdown。保留文件职责和有用的占位符。只返回请求的文件。"
   },
   "export": {
     "title": "配置导出",
     "subtitle": "查看主配置、解析后配置和生成输出预览。",
     "primary": "主配置",
     "resolved": "解析后配置",
-    "generated": "生成的运行时预览"
+    "generated": "生成的运行时预览",
+    "options": "导出选项",
+    "includeSecrets": "在本地备份中包含密钥"
   },
   "actions": {
     "create": "创建",
@@ -172,12 +257,14 @@
     "clearDecision": "清除本地记录",
     "archive": "归档",
     "load": "加载",
-    "upload": "??",
-    "enable": "??",
-    "download": "??",
-    "copyPath": "????",
-    "openFolder": "????",
-    "testConnection": "????"
+    "upload": "上传",
+    "enable": "启用",
+    "download": "下载",
+    "copyPath": "复制路径",
+    "openFolder": "打开文件夹",
+    "testConnection": "测试连接",
+    "publish": "发布",
+    "close": "关闭"
   },
   "fields": {
     "id": "ID",
@@ -297,15 +384,19 @@
     "supportFile": "支持文件",
     "supportFilePath": "支持文件路径",
     "supportFileContent": "支持文件内容",
-    "supportFileType": "??????",
-    "supportFileName": "?????",
-    "uploadFile": "????",
-    "supportUploadFile": "????"
+    "supportFileType": "支持文件类型",
+    "supportFileName": "支持文件名",
+    "uploadFile": "上传文件",
+    "supportUploadFile": "上传文件",
+    "storageDriver": "存储驱动覆盖",
+    "containerName": "容器名称覆盖",
+    "command": "命令"
   },
   "templateApply": {
     "keep": "保留现有文件",
     "missing": "只写入缺失文件",
-    "overwrite": "覆盖工作区文件"
+    "overwrite": "覆盖工作区文件",
+    "merge": "合并文件"
   },
   "validation": {
     "valid": "校验通过",
@@ -337,14 +428,14 @@
     "invalidUrlField": "{field} 必须是有效的 http/https URL，请再次确认。",
     "requiredField": "{field} 是必填项，请填写。",
     "invalidTemplateFile": "模板文件名必须是普通工作区文件名，只能使用字母、数字、点、下划线或连字符。",
-    "invalidSupportFileName": "?????????????????????????????",
-    "binaryFileSelected": "?????????????????????????",
-    "pathCopied": "??????????",
-    "pathUnavailable": "??????????????",
-    "copyPathPrompt": "??????",
-    "folderOpenRequested": "????????",
-    "openFolderFallback": "????????",
-    "llmTestPassed": "LLM ?????{model}?{latency} ms??"
+    "invalidSupportFileName": "支持文件路径只能使用字母、数字、点、下划线、连字符和斜杠。",
+    "binaryFileSelected": "已选择二进制文件，无法作为文本预览。",
+    "pathCopied": "路径已复制到剪贴板。",
+    "pathUnavailable": "当前没有可复制的路径。",
+    "copyPathPrompt": "复制此路径",
+    "folderOpenRequested": "已请求打开文件夹。",
+    "openFolderFallback": "无法自动打开文件夹，请手动查看该路径。",
+    "llmTestPassed": "LLM 测试通过：{model}，{latency} ms。"
   },
   "dialog": {
     "alertTitle": "提示",
@@ -362,7 +453,15 @@
     "archiveSkill": "将这个技能归档到 shared/skills/_deleted 吗？",
     "deleteSkillFile": "删除这个支持文件吗？",
     "buildPythonImage": "这会构建一个安装 Python 的本地 ZeroClaw 镜像。Docker build 可以通过 Docker daemon 以 root 执行命令。是否继续？",
-    "buildRootImage": "这会构建一个以 root 运行的本地 ZeroClaw 镜像。Root 容器可能以 root 写入文件并提高运行风险。是否继续？"
+    "buildRootImage": "这会构建一个以 root 运行的本地 ZeroClaw 镜像。Root 容器可能以 root 写入文件并提高运行风险。是否继续？",
+    "deleteAgentNamed": "删除智能体 {id}？",
+    "resetMatrixStateNamed": "重置 {id} 的 Matrix E2EE 状态？该智能体必须先停止。",
+    "deleteProfileNamed": "删除 {kind} {id}？",
+    "deleteSkillBundleNamed": "删除技能包 {id}？",
+    "archiveSkillNamed": "归档技能 {name}？",
+    "deleteSkillFileNamed": "删除 {path}？",
+    "deleteTemplateNamed": "删除模板 {id}？",
+    "deleteTemplateFileNamed": "删除 {file}？"
   },
   "common": {
     "loading": "加载中...",
@@ -480,8 +579,8 @@
       "supportFile": "选择一个已有支持文件加载到编辑器。",
       "supportFilePath": "references/、scripts/ 或 assets/ 下的相对路径。scripts/ 需要开启允许脚本。",
       "supportFileContent": "写入支持文件路径的内容。",
-      "supportFileType": "?????????????",
-      "supportFileName": "???????????????????????? notes.md?"
+      "supportFileType": "选择要编辑的支持文件目录。",
+      "supportFileName": "要创建或上传的支持文件名，例如 notes.md。"
     }
   },
   "vision": {
@@ -522,7 +621,8 @@
     "reviewedHelp": "标记为已确认只会在 config/generated 中记录一个本地判断，不会修改 Docker 标签、重命名资源或迁移数据。",
     "migrateTargetPrompt": "目标卷名称",
     "deleteTitle": "删除 Docker 资源",
-    "deleteTypeName": "输入资源名称以确认删除"
+    "deleteTypeName": "输入 {name} 以删除这个 {kind}。",
+    "lastAction": "上次资源操作"
   },
   "resourceDeleteWarnings": {
     "container": "删除容器会停止并移除该容器，但不会删除它挂载的卷。",
@@ -574,30 +674,51 @@
     "supportFiles": "支持文件",
     "tabsLabel": "技能分区",
     "tabs": {
-      "bundles": "???",
-      "library": "???",
-      "support": "????",
-      "runtime": "????"
+      "bundles": "技能包",
+      "library": "技能库",
+      "support": "支持文件",
+      "runtime": "运行时设置"
     },
     "runtimeHelp": "全局技能加载、仓库、创建和改进设置，会渲染到智能体运行时配置。",
     "bundleSettings": "技能包设置",
     "bundleSettingsHelp": "配置当前技能包别名、目录，以及可选的包含/排除过滤。",
-    "supportFilesHelp": "????????????? references/?scripts/ ? assets/ ?????",
+    "supportFilesHelp": "选择技能包和技能，然后编辑 references/、scripts/ 或 assets/ 下的文件。",
     "noSupportFiles": "还没有支持文件。",
     "loadingSkill": "正在加载所选技能。",
-    "supportTypeTabsLabel": "??????",
-    "supportTypeHelp": "????????????????????",
+    "supportTypeTabsLabel": "支持文件类型",
+    "supportTypeHelp": "这些文件位于当前技能的支持目录下。",
     "supportTypes": {
       "references": "references",
       "scripts": "scripts",
       "assets": "assets"
     },
-    "scriptsDisabledNotice": "?????????????????????????????????",
-    "scriptsEnabledNotice": "??????????",
-    "addTextFileTitle": "????????",
-    "addTextFileSubtitle": "?????????? UTF-8 ?????",
-    "uploadFileTitle": "??????",
-    "uploadFileSubtitle": "?????????????????",
-    "uploadTextOnlyNotice": "???????????????????????????????????"
+    "scriptsDisabledNotice": "脚本文件已全局禁用。启用后会影响所有技能包和智能体运行时。",
+    "scriptsEnabledNotice": "脚本文件已全局启用。",
+    "addTextFileTitle": "添加文本支持文件",
+    "addTextFileSubtitle": "在选中目录下创建 UTF-8 文本文件。",
+    "uploadFileTitle": "上传支持文件",
+    "uploadFileSubtitle": "将本地文件上传到选中的支持目录。",
+    "uploadTextOnlyNotice": "上传会保留原始字节。文本文件可以上传后编辑；二进制文件可下载或替换。",
+    "saveSettings": "保存设置",
+    "bundle": "技能包",
+    "skill": "技能",
+    "saveBundle": "保存技能包",
+    "saveSkill": "保存技能",
+    "saveFile": "保存文件",
+    "newTextFile": "新建文本文件",
+    "noDescription": "没有描述",
+    "noSkillsLoaded": "这个技能包尚未加载技能。",
+    "emptySkill": "选择或创建一个技能。",
+    "noFilesInType": "{type} 中没有文件。",
+    "selectBundleSkillFirst": "请先在技能库中选择技能包和技能。",
+    "unableToPreview": "无法以 UTF-8 文本预览此文件。\n\n{error}",
+    "newSkillContent": "# new-skill\n\n描述何时以及如何使用这个技能。\n"
+  },
+  "runtimeTabs": {
+    "status": "状态",
+    "logs": "日志",
+    "config": "配置",
+    "env": "环境",
+    "result": "结果"
   }
 }

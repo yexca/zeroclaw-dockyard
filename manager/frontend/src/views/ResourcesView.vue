@@ -1,7 +1,7 @@
 <template>
   <section class="view-stack">
-    <PageHeader title="Docker Resources" description="Containers, networks, and volumes classified by manager ownership.">
-      <UiButton variant="primary" @click="store.loadResources"><RefreshCw />Refresh</UiButton>
+    <PageHeader :title="t('resources.title')" :description="t('resources.subtitle')">
+      <UiButton variant="primary" @click="store.loadResources"><RefreshCw />{{ t("actions.refresh") }}</UiButton>
     </PageHeader>
 
     <div class="metric-grid">
@@ -14,28 +14,28 @@
     <UiCard v-for="group in groups" :key="`${group.kind}-detail`" :title="group.title">
       <div class="resource-buckets">
         <details v-for="bucket in buckets" :key="bucket.id" class="advanced-disclosure resource-bucket" :open="bucket.id === 'conflicts'">
-          <summary>{{ bucket.label }} · {{ rowsFor(group.data, bucket.id).length }}</summary>
+          <summary>{{ t(bucket.labelKey) }} / {{ rowsFor(group.data, bucket.id).length }}</summary>
           <div v-if="rowsFor(group.data, bucket.id).length" class="resource-row-list">
             <article v-for="row in rowsFor(group.data, bucket.id)" :key="resourceKey(group.kind, row)" class="resource-card">
               <div>
-                <strong>{{ row.name || row.id || row.container_name || "unnamed" }}</strong>
-                <span>{{ row.image || row.role || row.state || row.classification || bucket.label }}</span>
+                <strong>{{ row.name || row.id || row.container_name || t("common.unnamed") }}</strong>
+                <span>{{ row.image || row.role || row.state || row.classification || t(bucket.labelKey) }}</span>
               </div>
               <div class="button-row">
-                <UiButton v-if="canAdopt(bucket.id)" @click="runAction('adopt', group.kind, row)">Adopt</UiButton>
-                <UiButton v-if="canIgnore(bucket.id)" @click="runAction('ignore', group.kind, row)">Ignore</UiButton>
-                <UiButton v-if="bucket.id === 'ignored' || bucket.id === 'adopted'" @click="runAction('clear', group.kind, row)">Clear</UiButton>
-                <UiButton v-if="bucket.id === 'legacy'" @click="migrate(group.kind, row)">Migrate</UiButton>
-                <UiButton v-if="canDelete(bucket.id)" variant="danger" @click="deleteResource(group.kind, row)">Delete</UiButton>
+                <UiButton v-if="canAdopt(bucket.id)" @click="runAction('adopt', group.kind, row)">{{ t("actions.adopt") }}</UiButton>
+                <UiButton v-if="canIgnore(bucket.id)" @click="runAction('ignore', group.kind, row)">{{ t("actions.ignore") }}</UiButton>
+                <UiButton v-if="bucket.id === 'ignored' || bucket.id === 'adopted'" @click="runAction('clear', group.kind, row)">{{ t("actions.clearDecision") }}</UiButton>
+                <UiButton v-if="bucket.id === 'legacy'" @click="migrate(group.kind, row)">{{ t("actions.migrate") }}</UiButton>
+                <UiButton v-if="canDelete(bucket.id)" variant="danger" @click="deleteResource(group.kind, row)">{{ t("actions.delete") }}</UiButton>
               </div>
             </article>
           </div>
-          <p v-else class="empty-text">No resources in this bucket.</p>
+          <p v-else class="empty-text">{{ t("resources.emptyBucket") }}</p>
         </details>
       </div>
     </UiCard>
 
-    <UiCard v-if="lastResult" title="Last resource action">
+    <UiCard v-if="lastResult" :title="t('resources.lastAction')">
       <pre class="code-block">{{ JSON.stringify(lastResult, null, 2) }}</pre>
     </UiCard>
   </section>
@@ -47,23 +47,25 @@ import { RefreshCw } from "@lucide/vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useI18n } from "../composables/useI18n.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
+const { t } = useI18n();
 const lastResult = ref(null);
 const buckets = [
-  { id: "expected", label: "Expected" },
-  { id: "conflicts", label: "Conflicts" },
-  { id: "orphans", label: "Orphans" },
-  { id: "legacy", label: "Untracked" },
-  { id: "adopted", label: "Adopted" },
-  { id: "ignored", label: "Ignored" }
+  { id: "expected", labelKey: "resources.expected" },
+  { id: "conflicts", labelKey: "resources.conflicts" },
+  { id: "orphans", labelKey: "resources.orphans" },
+  { id: "legacy", labelKey: "resources.untracked" },
+  { id: "adopted", labelKey: "resources.adopted" },
+  { id: "ignored", labelKey: "resources.ignored" }
 ];
 
 const groups = computed(() => [
-  { kind: "container", title: "Containers", data: store.resources?.containers || {} },
-  { kind: "volume", title: "Volumes", data: store.resources?.volumes || {} },
-  { kind: "network", title: "Networks", data: store.resources?.networks || {} }
+  { kind: "container", title: t("resources.containers"), data: store.resources?.containers || {} },
+  { kind: "volume", title: t("resources.volumes"), data: store.resources?.volumes || {} },
+  { kind: "network", title: t("resources.networks"), data: store.resources?.networks || {} }
 ]);
 
 function rowsFor(group, bucket) {
@@ -75,7 +77,7 @@ function countRows(group) {
 }
 
 function summary(group) {
-  return buckets.map((bucket) => `${bucket.label}: ${rowsFor(group, bucket.id).length}`).join(" · ");
+  return buckets.map((bucket) => `${t(bucket.labelKey)}: ${rowsFor(group, bucket.id).length}`).join(" / ");
 }
 
 function resourceName(row) {
@@ -103,14 +105,14 @@ async function runAction(action, kind, row, extra = {}) {
 }
 
 async function migrate(kind, row) {
-  const target_name = prompt("Target resource name", `${resourceName(row)}-migrated`);
+  const target_name = prompt(t("resources.migrateTargetPrompt"), `${resourceName(row)}-migrated`);
   if (!target_name) return;
   await runAction("migrate", kind, row, { target_name });
 }
 
 async function deleteResource(kind, row) {
   const name = resourceName(row);
-  const typed = prompt(`Type ${name} to delete this ${kind}.`);
+  const typed = prompt(t("resources.deleteTypeName", { name, kind: t(`resourceKinds.${kind}`) }));
   if (typed !== name) return;
   await runAction("delete", kind, row);
 }

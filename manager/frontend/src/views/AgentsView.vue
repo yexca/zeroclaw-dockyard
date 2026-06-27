@@ -1,103 +1,103 @@
 <template>
   <section class="view-stack">
-    <PageHeader title="Agents" description="Create agents, wire reusable profiles, and control runtime containers.">
-      <UiButton variant="primary" @click="createAgent"><Plus />New agent</UiButton>
+    <PageHeader :title="t('agents.title')" :description="t('agents.subtitle')">
+      <UiButton variant="primary" @click="createAgent"><Plus />{{ t("agents.newAgent") }}</UiButton>
     </PageHeader>
 
     <div class="agent-workbench">
-      <UiCard title="Agent list" description="Drafts become runnable after their prompt template is applied.">
+      <UiCard :title="t('agents.list')" :description="t('agents.listHelp')">
         <div class="item-list">
           <button v-for="agent in store.agents" :key="itemId(agent)" :class="{ active: selectedId === itemId(agent) }" @click="selectAgent(agent)">
             <strong>{{ itemId(agent) }}</strong>
-            <span>{{ agent.llm_profile || "No LLM" }} / {{ agent.matrix_profile || "No Matrix" }}</span>
+            <span>{{ agent.llm_profile || t("agents.noLlm") }} / {{ agent.matrix_profile || t("agents.noMatrix") }}</span>
           </button>
-          <p v-if="!store.agents.length" class="empty-text">No agents yet.</p>
+          <p v-if="!store.agents.length" class="empty-text">{{ t("agents.emptyList") }}</p>
         </div>
       </UiCard>
 
-      <UiCard title="Agent details" :description="draft?._draft ? 'New unsaved agent.' : 'Core runtime and profile wiring.'">
+      <UiCard :title="t('agents.details')" :description="draft?._draft ? t('agents.unsaved') : t('agents.detailsHelp')">
         <form v-if="draft" class="form-grid" @submit.prevent="save">
-          <FormField v-model="draft.id" label="Agent ID" />
-          <FormField v-model="draft.host_port" label="Host port" type="number" />
-          <FormField v-model="draft.llm_profile" label="LLM profile" :options="profileOptions('llm')" />
-          <FormField v-model="draft.vision_profile" label="Vision profile" :options="profileOptions('vision', true)" />
-          <FormField v-model="draft.matrix_profile" label="Matrix profile" :options="profileOptions('matrix')" />
-          <FormField v-model="draft.mcp_profile" label="MCP profile" :options="profileOptions('mcp', true)" />
-          <FormField v-model="draft.prompt_template" label="Prompt template" :options="templateOptions" />
-          <FormField v-model="imagePreset" label="Docker image preset" :options="imageOptions" wide />
-          <FormField v-model="draft.image" label="Docker image" wide />
-          <FormField v-model="externalPeers" label="External peers" textarea wide />
-          <FormField v-model="skillBundles" label="Skill bundles" textarea wide />
+          <FormField v-model="draft.id" :label="t('agents.agentId')" />
+          <FormField v-model="draft.host_port" :label="t('fields.hostPort')" type="number" />
+          <FormField v-model="draft.llm_profile" :label="t('fields.llmProfile')" :options="profileOptions('llm')" />
+          <FormField v-model="draft.vision_profile" :label="t('fields.visionProfile')" :options="profileOptions('vision', true)" />
+          <FormField v-model="draft.matrix_profile" :label="t('fields.matrixProfile')" :options="profileOptions('matrix')" />
+          <FormField v-model="draft.mcp_profile" :label="t('fields.mcpProfile')" :options="profileOptions('mcp', true)" />
+          <FormField v-model="draft.prompt_template" :label="t('fields.promptTemplate')" :options="templateOptions" />
+          <FormField v-model="imagePreset" :label="t('fields.imagePreset')" :options="imageOptions" wide />
+          <FormField v-model="draft.image" :label="t('fields.dockerImage')" wide />
+          <FormField v-model="externalPeers" :label="t('fields.externalPeers')" textarea wide />
+          <FormField v-model="skillBundles" :label="t('fields.skillBundles')" textarea wide />
           <details class="advanced-disclosure form-field--wide">
-            <summary>Advanced agent settings</summary>
+            <summary>{{ t("fields.advanced") }}</summary>
             <div class="form-grid nested-form">
               <label class="check-row form-field--wide">
                 <input v-model="draft.enabled" type="checkbox" />
-                <span>Enabled</span>
+                <span>{{ t("fields.enabled") }}</span>
               </label>
-              <FormField v-model="draft.template_apply_mode" label="Template apply mode" :options="templateModeOptions" />
-              <FormField v-model="draft.storage_driver" label="Storage driver override" :options="storageOptions" />
-              <FormField v-model="draft.container_name" label="Container name override" />
-              <FormField v-model="envOverrides" label="Environment overrides" textarea wide />
+              <FormField v-model="draft.template_apply_mode" :label="t('fields.templateApplyMode')" :options="templateModeOptions" />
+              <FormField v-model="draft.storage_driver" :label="t('fields.storageDriver')" :options="storageOptions" />
+              <FormField v-model="draft.container_name" :label="t('fields.containerName')" />
+              <FormField v-model="envOverrides" :label="t('fields.environment')" textarea wide />
             </div>
           </details>
           <details class="advanced-disclosure form-field--wide">
-            <summary>Proactive sidecar</summary>
+            <summary>{{ t("fields.proactiveSettings") }}</summary>
             <div class="form-grid nested-form">
               <label class="check-row form-field--wide">
                 <input v-model="proactive.enabled" type="checkbox" />
-                <span>Enabled</span>
+                <span>{{ t("fields.enabled") }}</span>
               </label>
-              <FormField v-model="proactive.target" label="Target" />
-              <FormField v-model="proactive.channel" label="Channel" />
-              <FormField v-model="proactive.timezone" label="Timezone" />
-              <FormField v-model="proactive.quiet_hours" label="Quiet hours" />
-              <FormField v-model="proactive.random_min_minutes" label="Random min minutes" type="number" />
-              <FormField v-model="proactive.random_max_minutes" label="Random max minutes" type="number" />
-              <FormField v-model="proactive.poll_seconds" label="Poll seconds" type="number" />
-              <FormField v-model="proactive.agent_url" label="Gateway URL override" />
-              <FormField v-model="proactive.prompt" label="Wake prompt" textarea wide />
+              <FormField v-model="proactive.target" :label="t('fields.proactiveTarget')" />
+              <FormField v-model="proactive.channel" :label="t('fields.proactiveChannel')" />
+              <FormField v-model="proactive.timezone" :label="t('fields.proactiveTimezone')" />
+              <FormField v-model="proactive.quiet_hours" :label="t('fields.proactiveQuietHours')" />
+              <FormField v-model="proactive.random_min_minutes" :label="t('fields.proactiveRandomMinMinutes')" type="number" />
+              <FormField v-model="proactive.random_max_minutes" :label="t('fields.proactiveRandomMaxMinutes')" type="number" />
+              <FormField v-model="proactive.poll_seconds" :label="t('fields.proactivePollSeconds')" type="number" />
+              <FormField v-model="proactive.agent_url" :label="t('fields.proactiveAgentUrl')" />
+              <FormField v-model="proactive.prompt" :label="t('agents.wakePrompt')" textarea wide />
             </div>
           </details>
           <div class="button-row form-field--wide">
-            <UiButton variant="primary" type="submit"><Save />Save</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('start')"><Play />Start</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('stop')"><Square />Stop</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('restart')"><RotateCw />Restart</UiButton>
-            <UiButton v-if="!draft._draft" variant="danger" @click="resetMatrix"><RefreshCcw />Reset Matrix</UiButton>
-            <UiButton v-if="!draft._draft" variant="danger" @click="remove"><Trash2 />Delete</UiButton>
+            <UiButton variant="primary" type="submit"><Save />{{ t("actions.save") }}</UiButton>
+            <UiButton v-if="!draft._draft" @click="control('start')"><Play />{{ t("actions.start") }}</UiButton>
+            <UiButton v-if="!draft._draft" @click="control('stop')"><Square />{{ t("actions.stop") }}</UiButton>
+            <UiButton v-if="!draft._draft" @click="control('restart')"><RotateCw />{{ t("actions.restart") }}</UiButton>
+            <UiButton v-if="!draft._draft" variant="danger" @click="resetMatrix"><RefreshCcw />{{ t("actions.resetMatrixState") }}</UiButton>
+            <UiButton v-if="!draft._draft" variant="danger" @click="remove"><Trash2 />{{ t("actions.delete") }}</UiButton>
           </div>
         </form>
-        <p v-else class="empty-text">Select or create an agent.</p>
+        <p v-else class="empty-text">{{ t("agents.empty") }}</p>
       </UiCard>
 
-      <UiCard title="Runtime" description="Status, logs, generated previews, and workspace actions.">
+      <UiCard :title="t('agents.runtime')" :description="t('agents.runtimeHelp')">
         <template v-if="draft && !draft._draft">
           <div class="runtime-actions">
-            <UiButton @click="loadStatus"><Activity />Status</UiButton>
+            <UiButton @click="loadStatus"><Activity />{{ t("runtimeTabs.status") }}</UiButton>
             <label class="inline-select">
-              <span>Tail</span>
+              <span>{{ t("dashboard.tail") }}</span>
               <input v-model.number="logTail" type="number" min="1" max="2000" />
             </label>
-            <UiButton @click="loadLogs"><ScrollText />Logs</UiButton>
-            <UiButton @click="loadPreview"><FileCode2 />Config</UiButton>
-            <UiButton @click="loadEnv"><Braces />Env</UiButton>
-            <UiButton @click="downloadLogs"><Download />Download logs</UiButton>
+            <UiButton @click="loadLogs"><ScrollText />{{ t("runtimeTabs.logs") }}</UiButton>
+            <UiButton @click="loadPreview"><FileCode2 />{{ t("runtimeTabs.config") }}</UiButton>
+            <UiButton @click="loadEnv"><Braces />{{ t("runtimeTabs.env") }}</UiButton>
+            <UiButton @click="downloadLogs"><Download />{{ t("actions.downloadLogs") }}</UiButton>
           </div>
           <div class="runtime-actions">
             <label class="inline-select">
-              <span>Apply mode</span>
+              <span>{{ t("agents.applyMode") }}</span>
               <select v-model="applyTemplateMode">
                 <option v-for="option in templateModeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
             </label>
-            <UiButton @click="applyTemplate"><FileCheck2 />Apply template</UiButton>
-            <UiButton @click="runAgentAction('publish')"><Upload />Publish</UiButton>
-            <UiButton @click="runAgentAction('sync-to-runtime')"><ArrowUpFromLine />Sync to runtime</UiButton>
-            <UiButton @click="runAgentAction('sync-from-runtime')"><ArrowDownToLine />Sync from runtime</UiButton>
+            <UiButton @click="applyTemplate"><FileCheck2 />{{ t("actions.applyTemplate") }}</UiButton>
+            <UiButton @click="runAgentAction('publish')"><Upload />{{ t("actions.publish") }}</UiButton>
+            <UiButton @click="runAgentAction('sync-to-runtime')"><ArrowUpFromLine />{{ t("actions.syncToRuntime") }}</UiButton>
+            <UiButton @click="runAgentAction('sync-from-runtime')"><ArrowDownToLine />{{ t("actions.syncFromRuntime") }}</UiButton>
           </div>
           <div class="segment-tabs">
-            <button v-for="tab in runtimeTabs" :key="tab" :class="{ active: runtimeTab === tab }" @click="runtimeTab = tab">{{ tab }}</button>
+            <button v-for="tab in runtimeTabs" :key="tab" :class="{ active: runtimeTab === tab }" @click="runtimeTab = tab">{{ t(`runtimeTabs.${tab}`) }}</button>
           </div>
           <div v-if="runtimeTab === 'status'" class="runtime-summary">
             <div v-for="(value, key) in statusSummary" :key="key">
@@ -110,7 +110,7 @@
           <pre v-else-if="runtimeTab === 'env'" class="code-block">{{ envText }}</pre>
           <pre v-else class="code-block">{{ resultText }}</pre>
         </template>
-        <p v-else class="empty-text">Save the agent before using runtime actions.</p>
+        <p v-else class="empty-text">{{ t("agents.saveBeforeRuntime") }}</p>
       </UiCard>
     </div>
   </section>
@@ -140,10 +140,12 @@ import FormField from "../components/FormField.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
+const { t } = useI18n();
 const selectedId = ref("");
 const draft = ref(null);
 const runtimeTab = ref("status");
@@ -157,15 +159,15 @@ const applyTemplateMode = ref("keep");
 const logTail = ref(200);
 const DEFAULT_ZEROCLAW_IMAGE = "ghcr.io/zeroclaw-labs/zeroclaw:v0.8.1-debian";
 const templateModeOptions = [
-  { label: "Keep existing files", value: "keep" },
-  { label: "Only missing files", value: "missing" },
-  { label: "Overwrite files", value: "overwrite" },
-  { label: "Merge files", value: "merge" }
+  { label: t("templateApply.keep"), value: "keep" },
+  { label: t("templateApply.missing"), value: "missing" },
+  { label: t("templateApply.overwrite"), value: "overwrite" },
+  { label: t("templateApply.merge"), value: "merge" }
 ];
 const storageOptions = [
-  { label: "Use manager default", value: "" },
-  { label: "Volume", value: "volume" },
-  { label: "Bind", value: "bind" }
+  { label: t("common.default"), value: "" },
+  { label: t("agents.storage.volume"), value: "volume" },
+  { label: t("agents.storage.bind"), value: "bind" }
 ];
 
 const imageOptions = computed(() => {
@@ -175,10 +177,10 @@ const imageOptions = computed(() => {
     root: "zeroclaw-root:v0.8.1-debian"
   };
   return [
-    { label: "Custom", value: "__custom__" },
-    { label: "Official ZeroClaw", value: recommended.official },
-    { label: "Python support", value: recommended.python },
-    { label: "Root user", value: recommended.root }
+    { label: t("images.custom"), value: "__custom__" },
+    { label: t("images.official"), value: recommended.official },
+    { label: t("images.python"), value: recommended.python },
+    { label: t("images.root"), value: recommended.root }
   ];
 });
 
@@ -243,13 +245,13 @@ const proactive = computed({
 });
 
 const templateOptions = computed(() => [
-  { label: "None", value: "" },
+  { label: t("common.none"), value: "" },
   ...store.templates.map((template) => ({ label: itemId(template), value: itemId(template) }))
 ]);
 
 function profileOptions(kind, optional = false) {
   const values = (store.profiles[kind] || []).map((profile) => ({ label: itemId(profile), value: itemId(profile) }));
-  return optional ? [{ label: "None", value: "" }, ...values] : values;
+  return optional ? [{ label: t("common.none"), value: "" }, ...values] : values;
 }
 
 function selectAgent(agent) {
@@ -276,7 +278,7 @@ async function save() {
 }
 
 async function remove() {
-  if (!draft.value?._draft && confirm(`Delete agent ${draft.value.id}?`)) {
+  if (!draft.value?._draft && confirm(t("confirm.deleteAgentNamed", { id: draft.value.id }))) {
     await store.deleteAgent(draft.value.id);
     draft.value = null;
     selectedId.value = "";
@@ -286,7 +288,7 @@ async function remove() {
 const statusSummary = computed(() => {
   const status = runtimeStatus.value || {};
   return {
-    state: status.state || status.status || "unknown",
+    state: status.state || status.status || t("common.unknown"),
     health: status.health || "-",
     image: status.image || draft.value?.image || "-",
     mapped_port: status.mapped_port || status.port || draft.value?.host_port || "-",
@@ -296,13 +298,13 @@ const statusSummary = computed(() => {
 });
 
 const logsText = computed(() => {
-  if (!runtimeLogs.value) return "No logs loaded.";
+  if (!runtimeLogs.value) return t("dashboard.logsEmpty");
   return (runtimeLogs.value.lines || []).join("\n") || JSON.stringify(runtimeLogs.value, null, 2);
 });
 
-const configText = computed(() => formatRuntime(runtimeConfig.value, "No config preview loaded."));
-const envText = computed(() => formatRuntime(runtimeEnv.value, "No env preview loaded."));
-const resultText = computed(() => formatRuntime(runtimeResult.value, "No action result loaded."));
+const configText = computed(() => formatRuntime(runtimeConfig.value, t("agents.noConfigPreview")));
+const envText = computed(() => formatRuntime(runtimeEnv.value, t("agents.noEnvPreview")));
+const resultText = computed(() => formatRuntime(runtimeResult.value, t("agents.noActionResult")));
 
 function formatRuntime(value, empty) {
   if (!value) return empty;
@@ -352,7 +354,7 @@ function downloadLogs() {
 }
 
 async function resetMatrix() {
-  if (!confirm(`Reset Matrix E2EE state for ${draft.value.id}? The agent must be stopped.`)) return;
+  if (!confirm(t("confirm.resetMatrixStateNamed", { id: draft.value.id }))) return;
   await runAgentAction("reset-matrix-state");
 }
 

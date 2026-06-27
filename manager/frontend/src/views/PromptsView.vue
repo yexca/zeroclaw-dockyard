@@ -1,69 +1,69 @@
 <template>
   <section class="view-stack">
-    <PageHeader title="Prompt Templates" description="Edit reusable workspace prompt files as structured templates.">
-      <UiButton variant="primary" @click="createTemplate"><Plus />New template</UiButton>
+    <PageHeader :title="t('prompts.title')" :description="t('prompts.subtitle')">
+      <UiButton variant="primary" @click="createTemplate"><Plus />{{ t("prompts.newTemplate") }}</UiButton>
     </PageHeader>
 
     <div class="editor-layout">
-      <UiCard title="Templates">
+      <UiCard :title="t('prompts.templates')">
         <template #actions>
-          <UiButton v-if="draft" @click="duplicateTemplate"><Copy />Duplicate</UiButton>
+          <UiButton v-if="draft" @click="duplicateTemplate"><Copy />{{ t("actions.duplicate") }}</UiButton>
         </template>
         <div class="item-list">
           <button v-for="template in store.templates" :key="itemId(template)" :class="{ active: selectedId === itemId(template) }" @click="selectTemplate(template)">
             <strong>{{ itemId(template) }}</strong>
-            <span>{{ Object.keys(template.files || {}).length }} files</span>
+            <span>{{ t("prompts.fileCount", { count: Object.keys(template.files || {}).length }) }}</span>
           </button>
-          <p v-if="!store.templates.length" class="empty-text">No templates yet.</p>
+          <p v-if="!store.templates.length" class="empty-text">{{ t("prompts.emptyList") }}</p>
         </div>
       </UiCard>
 
-      <UiCard title="Template details" description="Use JSON to preserve arbitrary prompt file mappings.">
+      <UiCard :title="t('prompts.details')" :description="t('prompts.detailsHelp')">
         <form v-if="draft" class="form-grid" @submit.prevent="save">
-          <FormField v-model="draft.id" label="Template ID" />
-          <FormField v-model="draft.description" label="Description" wide />
+          <FormField v-model="draft.id" :label="t('prompts.templateId')" />
+          <FormField v-model="draft.description" :label="t('fields.description')" wide />
           <div class="form-field form-field--wide">
-            <span>Files</span>
+            <span>{{ t("prompts.filesLabel") }}</span>
             <div class="file-tabs">
               <button v-for="file in fileNames" :key="file" :class="{ active: selectedFile === file }" type="button" @click="selectedFile = file">
                 {{ file }}
                 <small>{{ fileBadge(file) }}</small>
               </button>
-              <button type="button" @click="addFile"><Plus />File</button>
+              <button type="button" @click="addFile"><Plus />{{ t("prompts.file") }}</button>
             </div>
             <div v-if="selectedFile" class="template-file-meta">
               <strong>{{ selectedFile }}</strong>
               <span>{{ fileHelp(selectedFile) }}</span>
               <div class="button-row">
-                <UiButton type="button" @click="renameFile"><Pencil />Rename</UiButton>
-                <UiButton type="button" variant="danger" :disabled="protectedFile(selectedFile)" @click="deleteFile"><Trash2 />Delete</UiButton>
+                <UiButton type="button" @click="renameFile"><Pencil />{{ t("prompts.rename") }}</UiButton>
+                <UiButton type="button" variant="danger" :disabled="protectedFile(selectedFile)" @click="deleteFile"><Trash2 />{{ t("actions.delete") }}</UiButton>
               </div>
             </div>
             <textarea v-if="selectedFile" v-model="draft.files[selectedFile]" class="template-editor-text" spellcheck="false" />
           </div>
           <div class="form-field form-field--wide">
             <details class="advanced-disclosure">
-              <summary>Advanced JSON</summary>
+              <summary>{{ t("profiles.advancedJson") }}</summary>
               <JsonEditor v-model="draft" />
             </details>
           </div>
           <div class="button-row form-field--wide">
-            <UiButton variant="primary" type="submit"><Save />Save</UiButton>
-            <UiButton type="button" @click="aiFillOpen = !aiFillOpen"><Sparkles />AI fill</UiButton>
-            <UiButton v-if="!draft._draft" type="button" variant="danger" @click="deleteTemplate"><Trash2 />Delete template</UiButton>
+            <UiButton variant="primary" type="submit"><Save />{{ t("actions.save") }}</UiButton>
+            <UiButton type="button" @click="aiFillOpen = !aiFillOpen"><Sparkles />{{ t("actions.aiFill") }}</UiButton>
+            <UiButton v-if="!draft._draft" type="button" variant="danger" @click="deleteTemplate"><Trash2 />{{ t("prompts.deleteTemplate") }}</UiButton>
           </div>
         </form>
-        <p v-else class="empty-text">Select or create a template.</p>
+        <p v-else class="empty-text">{{ t("prompts.empty") }}</p>
       </UiCard>
     </div>
 
-    <UiCard v-if="draft && aiFillOpen" title="AI fill" description="Generate selected prompt files into this browser-side draft. Review before saving.">
+    <UiCard v-if="draft && aiFillOpen" :title="t('prompts.aiFillTitle')" :description="t('prompts.aiFillSubtitle')">
       <form class="form-grid" @submit.prevent="runAiFill">
-        <FormField v-model="aiFill.llm_profile" label="LLM profile" :options="llmOptions" />
-        <FormField v-model="aiFill.description" label="Agent description" wide />
-        <FormField v-model="aiFill.instruction" label="Generation instruction" textarea wide />
+        <FormField v-model="aiFill.llm_profile" :label="t('fields.llmProfile')" :options="llmOptions" />
+        <FormField v-model="aiFill.description" :label="t('prompts.aiDescription')" wide />
+        <FormField v-model="aiFill.instruction" :label="t('prompts.aiInstruction')" textarea wide />
         <div class="form-field form-field--wide">
-          <span>Target files</span>
+          <span>{{ t("prompts.targetFiles") }}</span>
           <div class="file-chip-grid">
             <label v-for="file in fileNames" :key="file" class="check-row file-chip">
               <input v-model="aiFill.files" :value="file" type="checkbox" />
@@ -72,7 +72,7 @@
           </div>
         </div>
         <div class="form-field form-field--wide">
-          <span>Reference files</span>
+          <span>{{ t("prompts.referenceFiles") }}</span>
           <div class="file-chip-grid">
             <label v-for="file in fileNames" :key="file" class="check-row file-chip">
               <input v-model="aiFill.reference_files" :value="file" type="checkbox" />
@@ -81,8 +81,8 @@
           </div>
         </div>
         <div class="button-row form-field--wide">
-          <UiButton variant="primary" type="submit"><Sparkles />Generate</UiButton>
-          <UiButton type="button" @click="aiFillOpen = false">Close</UiButton>
+          <UiButton variant="primary" type="submit"><Sparkles />{{ t("actions.generate") }}</UiButton>
+          <UiButton type="button" @click="aiFillOpen = false">{{ t("actions.close") }}</UiButton>
         </div>
       </form>
     </UiCard>
@@ -97,10 +97,12 @@ import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useI18n } from "../composables/useI18n.js";
 import { clone, itemId } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
+const { t } = useI18n();
 const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md"];
 const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", "PROACTIVE.md"];
 const selectedId = ref("");
@@ -109,7 +111,7 @@ const selectedFile = ref("");
 const aiFillOpen = ref(false);
 const aiFill = ref({
   llm_profile: "",
-  instruction: "Generate concise, practical Markdown for the selected ZeroClaw prompt files. Preserve file roles and placeholders where useful. Return only the requested files.",
+  instruction: t("prompts.defaultAiInstruction"),
   description: "",
   files: [],
   reference_files: []
@@ -162,7 +164,7 @@ async function save() {
 }
 
 async function deleteTemplate() {
-  if (!draft.value || !confirm(`Delete template ${itemId(draft.value)}?`)) return;
+  if (!draft.value || !confirm(t("confirm.deleteTemplateNamed", { id: itemId(draft.value) }))) return;
   await store.deleteTemplate(itemId(draft.value));
   draft.value = null;
   selectedId.value = "";
@@ -170,7 +172,7 @@ async function deleteTemplate() {
 }
 
 function addFile() {
-  const name = prompt("File name", "USER.md");
+  const name = prompt(t("prompts.addFilePrompt"), "USER.md");
   if (!name) return;
   const normalized = validateFilename(name);
   if (!normalized) return;
@@ -182,13 +184,13 @@ function addFile() {
 
 function renameFile() {
   if (!selectedFile.value) return;
-  const next = prompt("New file name", selectedFile.value);
+  const next = prompt(t("prompts.renameFilePrompt"), selectedFile.value);
   if (!next) return;
   const normalized = validateFilename(next);
   if (!normalized) return;
   if (normalized === selectedFile.value) return;
   if (draft.value.files?.[normalized] !== undefined) {
-    alert("A file with that name already exists.");
+    alert(t("prompts.fileExists"));
     return;
   }
   draft.value.files[normalized] = draft.value.files[selectedFile.value] || "";
@@ -199,7 +201,7 @@ function renameFile() {
 
 function deleteFile() {
   if (!selectedFile.value || protectedFile(selectedFile.value)) return;
-  if (!confirm(`Delete ${selectedFile.value}?`)) return;
+  if (!confirm(t("confirm.deleteTemplateFileNamed", { file: selectedFile.value }))) return;
   delete draft.value.files[selectedFile.value];
   selectedFile.value = Object.keys(draft.value.files || {})[0] || "";
   resetAiFill();
@@ -240,23 +242,23 @@ function protectedFile(file) {
 
 function fileBadge(file) {
   const index = PROMPT_SYSTEM_FILES.indexOf(file);
-  if (index >= 0) return `read ${index + 1}`;
-  if (file === "HEARTBEAT.md") return "heartbeat";
-  if (file === "PROACTIVE.md") return "optional";
-  return "custom";
+  if (index >= 0) return t("prompts.readOrder", { n: index + 1 });
+  if (file === "HEARTBEAT.md") return t("prompts.heartbeatOnly");
+  if (file === "PROACTIVE.md") return t("prompts.optionalServiceFile");
+  return t("prompts.customFile");
 }
 
 function fileHelp(file) {
-  if (PROMPT_SYSTEM_FILES.includes(file)) return "Official ZeroClaw prompt file injected in source-defined order.";
-  if (file === "HEARTBEAT.md") return "Read by the heartbeat worker, not injected into normal chat prompts.";
-  if (file === "PROACTIVE.md") return "Optional Dockyard proactive sidecar convention.";
-  return "Custom workspace file. Reference it from an official file when it should matter.";
+  if (PROMPT_SYSTEM_FILES.includes(file)) return t("prompts.officialFileHelp");
+  if (file === "HEARTBEAT.md") return t("prompts.heartbeatFileHelp");
+  if (file === "PROACTIVE.md") return t("prompts.optionalServiceFileHelp");
+  return t("prompts.customFileHelp");
 }
 
 function normalizeTemplateFilename(value) {
   const filename = String(value || "").trim().replaceAll("\\", "/").split("/").pop();
   if (!filename || !/^[A-Za-z0-9_.-]+$/.test(filename)) {
-    throw new Error("File names may use letters, numbers, dot, underscore, or hyphen.");
+    throw new Error(t("prompts.invalidFileName"));
   }
   return filename;
 }
@@ -265,7 +267,7 @@ function validateFilename(value) {
   try {
     return normalizeTemplateFilename(value);
   } catch (error) {
-    alert(error.message || String(error));
+    alert(t("prompts.invalidFileName"));
     return "";
   }
 }

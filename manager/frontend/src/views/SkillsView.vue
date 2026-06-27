@@ -1,36 +1,36 @@
 <template>
   <section class="view-stack">
-    <PageHeader title="Skills" description="Manage runtime skill settings and bundle metadata.">
-      <UiButton v-if="selectedTab === 'runtime'" variant="primary" @click="save"><Save />Save settings</UiButton>
+    <PageHeader :title="t('skills.title')" :description="t('skills.subtitle')">
+      <UiButton v-if="selectedTab === 'runtime'" variant="primary" @click="save"><Save />{{ t("skills.saveSettings") }}</UiButton>
     </PageHeader>
 
     <div class="segment-tabs page-tabs">
       <button v-for="tab in tabs" :key="tab.id" :class="{ active: selectedTab === tab.id }" @click="selectedTab = tab.id">
-        {{ tab.label }}
+        {{ t(tab.labelKey) }}
       </button>
     </div>
 
     <div v-if="selectedTab === 'runtime'" class="tab-panel">
-      <UiCard title="Runtime settings" description="Global runtime behavior for skill loading and Open Skills.">
+      <UiCard :title="t('skills.settings')" :description="t('skills.runtimeHelp')">
         <div class="form-grid">
           <label class="check-row form-field--wide">
             <input v-model="skills.allow_scripts" type="checkbox" />
-            <span>Allow skill scripts</span>
+            <span>{{ t("fields.allowScripts") }}</span>
           </label>
           <label class="check-row form-field--wide">
             <input v-model="skills.open_skills_enabled" type="checkbox" />
-            <span>Open Skills enabled</span>
+            <span>{{ t("fields.openSkillsEnabled") }}</span>
           </label>
-          <FormField v-model="skills.registry_url" label="Registry URL" wide />
-          <FormField v-model="skills.prompt_injection_mode" label="Prompt injection mode" />
+          <FormField v-model="skills.registry_url" :label="t('fields.registryUrl')" wide />
+          <FormField v-model="skills.prompt_injection_mode" :label="t('fields.promptInjectionMode')" />
         </div>
       </UiCard>
     </div>
 
     <div v-else-if="selectedTab === 'bundles'" class="tab-panel">
-      <UiCard title="Bundles">
+      <UiCard :title="t('skills.tabs.bundles')">
         <template #actions>
-          <UiButton @click="newBundle"><Plus />Bundle</UiButton>
+          <UiButton @click="newBundle"><Plus />{{ t("skills.bundle") }}</UiButton>
         </template>
         <div class="item-list">
           <button v-for="bundle in bundles" :key="bundle.id" :class="{ active: selectedBundleId === bundle.id }" @click="selectBundle(bundle)">
@@ -39,54 +39,54 @@
           </button>
         </div>
         <form v-if="bundleDraft" class="form-grid bundle-form" @submit.prevent="saveBundle">
-          <FormField v-model="bundleDraft.id" label="ID" />
-          <FormField v-model="bundleDraft.directory" label="Directory" />
-          <FormField v-model="bundleInclude" label="Include" textarea wide />
-          <FormField v-model="bundleExclude" label="Exclude" textarea wide />
+          <FormField v-model="bundleDraft.id" :label="t('fields.id')" />
+          <FormField v-model="bundleDraft.directory" :label="t('fields.directory')" />
+          <FormField v-model="bundleInclude" :label="t('fields.includeSkills')" textarea wide />
+          <FormField v-model="bundleExclude" :label="t('fields.excludeSkills')" textarea wide />
           <div class="button-row form-field--wide">
-            <UiButton variant="primary" type="submit"><Save />Save bundle</UiButton>
-            <UiButton v-if="!bundleDraft._draft" variant="danger" @click="deleteBundle"><Trash2 />Delete</UiButton>
+            <UiButton variant="primary" type="submit"><Save />{{ t("skills.saveBundle") }}</UiButton>
+            <UiButton v-if="!bundleDraft._draft" variant="danger" @click="deleteBundle"><Trash2 />{{ t("actions.delete") }}</UiButton>
           </div>
         </form>
       </UiCard>
     </div>
 
     <div v-else-if="selectedTab === 'library'" class="tab-panel">
-      <UiCard title="Skill library" description="Edit canonical SKILL.md content in the selected bundle.">
+      <UiCard :title="t('skills.tabs.library')" :description="t('skills.bundleSkillsHelp')">
         <template #actions>
-          <UiButton :disabled="!selectedBundleId" @click="newSkill"><Plus />Skill</UiButton>
+          <UiButton :disabled="!selectedBundleId" @click="newSkill"><Plus />{{ t("skills.skill") }}</UiButton>
         </template>
         <div class="skill-library-layout">
           <div class="item-list">
             <button v-for="skill in skillsList" :key="skill.name" :class="{ active: selectedSkillName === skill.name }" @click="selectSkill(skill.name)">
               <strong>{{ skill.name }}</strong>
-              <span>{{ skill.frontmatter?.description || "No description" }}</span>
+              <span>{{ skill.frontmatter?.description || t("skills.noDescription") }}</span>
             </button>
-            <p v-if="!skillsList.length" class="empty-text">No skills loaded for this bundle.</p>
+            <p v-if="!skillsList.length" class="empty-text">{{ t("skills.noSkillsLoaded") }}</p>
           </div>
           <form v-if="skillDraft" class="form-grid" @submit.prevent="saveSkillDoc">
-            <FormField v-model="skillDraft.name" label="Name" />
-            <FormField v-model="skillDraft.description" label="Description" />
-            <FormField v-model="skillDraft.category" label="Category" />
-            <FormField v-model="skillTags" label="Tags" />
-            <FormField v-model="skillDraft.content" label="SKILL.md body" textarea wide />
+            <FormField v-model="skillDraft.name" :label="t('fields.name')" />
+            <FormField v-model="skillDraft.description" :label="t('fields.description')" />
+            <FormField v-model="skillDraft.category" :label="t('fields.category')" />
+            <FormField v-model="skillTags" :label="t('fields.tags')" />
+            <FormField v-model="skillDraft.content" :label="t('fields.skillBody')" textarea wide />
             <div class="button-row form-field--wide">
-              <UiButton variant="primary" type="submit"><Save />Save skill</UiButton>
-              <UiButton v-if="!skillDraft._draft" variant="danger" @click="deleteSkillDoc"><Trash2 />Archive</UiButton>
+              <UiButton variant="primary" type="submit"><Save />{{ t("skills.saveSkill") }}</UiButton>
+              <UiButton v-if="!skillDraft._draft" variant="danger" @click="deleteSkillDoc"><Trash2 />{{ t("actions.archive") }}</UiButton>
             </div>
           </form>
-          <p v-else class="empty-text">Select or create a skill.</p>
+          <p v-else class="empty-text">{{ t("skills.emptySkill") }}</p>
         </div>
       </UiCard>
     </div>
 
     <div v-else class="tab-panel">
-      <UiCard title="Support files" description="References, scripts, and assets for the selected skill.">
+      <UiCard :title="t('skills.supportFiles')" :description="t('skills.supportFilesHelp')">
         <div v-if="selectedBundleId && selectedSkillName" class="support-file-layout">
           <aside>
             <div class="segment-tabs compact-tabs">
               <button v-for="type in supportTypes" :key="type" :class="{ active: supportType === type }" @click="supportType = type">
-                {{ type }}
+                {{ t(`skills.supportTypes.${type}`) }}
               </button>
             </div>
             <div class="item-list support-file-list">
@@ -99,24 +99,24 @@
                 <strong>{{ fileName(file) }}</strong>
                 <span>{{ file }}</span>
               </button>
-              <p v-if="!supportFilesForType.length" class="empty-text">No files in {{ supportType }}.</p>
+              <p v-if="!supportFilesForType.length" class="empty-text">{{ t("skills.noFilesInType", { type: t(`skills.supportTypes.${supportType}`) }) }}</p>
             </div>
           </aside>
           <form class="form-grid" @submit.prevent="saveSupportFile">
-            <FormField v-model="supportFilePath" label="File path" wide />
-            <FormField v-model="supportFileContent" label="Content" textarea wide />
+            <FormField v-model="supportFilePath" :label="t('fields.supportFilePath')" wide />
+            <FormField v-model="supportFileContent" :label="t('fields.supportFileContent')" textarea wide />
             <div class="button-row form-field--wide">
-              <UiButton variant="primary" type="submit"><Save />Save file</UiButton>
-              <UiButton type="button" @click="newSupportFile"><Plus />New text file</UiButton>
-              <UiButton v-if="supportFilePath" type="button" variant="danger" @click="deleteSupportFile"><Trash2 />Delete</UiButton>
+              <UiButton variant="primary" type="submit"><Save />{{ t("skills.saveFile") }}</UiButton>
+              <UiButton type="button" @click="newSupportFile"><Plus />{{ t("skills.newTextFile") }}</UiButton>
+              <UiButton v-if="supportFilePath" type="button" variant="danger" @click="deleteSupportFile"><Trash2 />{{ t("actions.delete") }}</UiButton>
             </div>
             <div class="form-field form-field--wide">
-              <span>Upload file</span>
+              <span>{{ t("fields.uploadFile") }}</span>
               <input type="file" @change="uploadSupportFile" />
             </div>
           </form>
         </div>
-        <p v-else class="empty-text">Select a bundle and skill in Skill library first.</p>
+        <p v-else class="empty-text">{{ t("skills.selectBundleSkillFirst") }}</p>
       </UiCard>
     </div>
   </section>
@@ -129,18 +129,20 @@ import FormField from "../components/FormField.vue";
 import PageHeader from "../components/PageHeader.vue";
 import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
+import { useI18n } from "../composables/useI18n.js";
 import { clone } from "../lib/api.js";
 import { useManagerStore } from "../stores/manager.js";
 
 const store = useManagerStore();
+const { t } = useI18n();
 const skills = reactive({});
 const bundles = computed(() => store.skillBundles);
 const selectedTab = ref("runtime");
 const tabs = [
-  { id: "runtime", label: "Runtime settings" },
-  { id: "bundles", label: "Bundles" },
-  { id: "library", label: "Skill library" },
-  { id: "support", label: "Support files" }
+  { id: "runtime", labelKey: "skills.tabs.runtime" },
+  { id: "bundles", labelKey: "skills.tabs.bundles" },
+  { id: "library", labelKey: "skills.tabs.library" },
+  { id: "support", labelKey: "skills.tabs.support" }
 ];
 const selectedBundleId = ref("");
 const bundleDraft = ref(null);
@@ -220,7 +222,7 @@ async function saveBundle() {
 }
 
 async function deleteBundle() {
-  if (bundleDraft.value && confirm(`Delete skill bundle ${bundleDraft.value.id}?`)) {
+  if (bundleDraft.value && confirm(t("confirm.deleteSkillBundleNamed", { id: bundleDraft.value.id }))) {
     await store.deleteSkillBundle(bundleDraft.value.id);
     bundleDraft.value = null;
     selectedBundleId.value = "";
@@ -255,7 +257,7 @@ function newSkill() {
     description: "",
     category: "",
     tags: [],
-    content: "# new-skill\n\nDescribe when and how to use this skill.\n",
+    content: t("skills.newSkillContent"),
     _draft: true
   };
 }
@@ -284,7 +286,7 @@ async function saveSkillDoc() {
 }
 
 async function deleteSkillDoc() {
-  if (!selectedSkillName.value || !confirm(`Archive skill ${selectedSkillName.value}?`)) return;
+  if (!selectedSkillName.value || !confirm(t("confirm.archiveSkillNamed", { name: selectedSkillName.value }))) return;
   await store.deleteSkill(selectedBundleId.value, selectedSkillName.value);
   selectedSkillName.value = "";
   skillDraft.value = null;
@@ -307,7 +309,7 @@ async function loadSupportFile(path) {
     const result = await store.readSupportFile(selectedBundleId.value, selectedSkillName.value, path);
     supportFileContent.value = result.content || "";
   } catch (error) {
-    supportFileContent.value = `Unable to preview this file as UTF-8 text.\n\n${error.message || error}`;
+    supportFileContent.value = t("skills.unableToPreview", { error: error.message || error });
   }
 }
 
@@ -318,7 +320,7 @@ async function saveSupportFile() {
 }
 
 async function deleteSupportFile() {
-  if (!supportFilePath.value || !confirm(`Delete ${supportFilePath.value}?`)) return;
+  if (!supportFilePath.value || !confirm(t("confirm.deleteSkillFileNamed", { path: supportFilePath.value }))) return;
   await store.deleteSupportFile(selectedBundleId.value, selectedSkillName.value, supportFilePath.value);
   supportFilePath.value = "";
   supportFileContent.value = "";
