@@ -666,6 +666,21 @@ mark.bad {
   font-size: 13px;
 }
 
+.export-mode,
+.export-result {
+  display: grid;
+  gap: 14px;
+}
+
+.export-mode {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.export-counts .ui-card {
+  box-shadow: none;
+}
+
 .file-tabs {
   display: flex;
   gap: 6px;
