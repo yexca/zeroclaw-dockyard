@@ -3,7 +3,8 @@
     "title": "ZeroClaw 管理器",
     "eyebrow": "ZeroClaw Matrix",
     "heading": "管理器 WebUI",
-    "description": "用于结构化智能体配置和 Docker API 编排的本地控制台。"
+    "description": "用于结构化智能体配置和 Docker API 编排的本地控制台。",
+    "status": "本地管理控制台"
   },
   "preferences": {
     "label": "偏好设置",
@@ -152,6 +153,7 @@
     "resetMatrixState": "重置 Matrix E2EE 状态",
     "logs": "日志",
     "downloadLogs": "下载日志",
+    "refresh": "刷新",
     "refreshStatus": "刷新状态",
     "pullOfficial": "拉取官方镜像",
     "buildPythonImage": "构建 Python 镜像",

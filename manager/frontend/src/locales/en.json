@@ -3,7 +3,8 @@
     "title": "ZeroClaw Dockyard",
     "eyebrow": "ZeroClaw Matrix",
     "heading": "Dockyard WebUI",
-    "description": "Local control surface for structured agent configuration and Docker API orchestration."
+    "description": "Local control surface for structured agent configuration and Docker API orchestration.",
+    "status": "Local manager control surface"
   },
   "preferences": {
     "label": "Preferences",
@@ -23,7 +24,7 @@
     "label": "Management sections",
     "dashboard": "Dashboard",
     "agents": "Agents",
-    "images": "Images",
+    "images": "Docker Images",
     "llm": "LLM Profiles",
     "vision": "Vision LLM Profiles",
     "matrix": "Matrix Profiles",
@@ -194,6 +195,7 @@
     "resetMatrixState": "Reset Matrix E2EE state",
     "logs": "Logs",
     "downloadLogs": "Download logs",
+    "refresh": "Refresh",
     "refreshStatus": "Refresh status",
     "pullOfficial": "Pull official image",
     "buildPythonImage": "Build Python image",

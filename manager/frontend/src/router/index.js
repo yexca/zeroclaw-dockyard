@@ -9,7 +9,7 @@ import ResourcesView from "../views/ResourcesView.vue";
 import ExportView from "../views/ExportView.vue";
 
 export const routes = [
-  { path: "/", redirect: "/agents" },
+  { path: "/", redirect: "/dashboard" },
   { path: "/dashboard", name: "dashboard", component: DashboardView, meta: { label: "Dashboard" } },
   { path: "/agents", name: "agents", component: AgentsView, meta: { label: "Agents" } },
   { path: "/profiles/:kind", name: "profiles", component: ProfilesView, meta: { label: "Profiles" } },
