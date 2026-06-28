@@ -188,7 +188,8 @@
       "multiMessage": "Multi message",
       "edit": "Edit",
       "disabled": "Disabled"
-    }
+    },
+    "testPassed": "LLM test passed"
   },
   "skills": {
     "title": "Skills",
@@ -771,5 +772,10 @@
     "config": "Config",
     "env": "Env",
     "result": "Result"
+  },
+  "toast": {
+    "success": "Done",
+    "error": "Needs attention",
+    "info": "Notice"
   }
 }

@@ -1,7 +1,7 @@
 <template>
   <section class="view-stack">
     <PageHeader :title="t('dashboard.title')" :description="t('dashboard.subtitle')">
-      <UiButton variant="primary" @click="refreshDashboard"><RefreshCw />{{ t("actions.refresh") }}</UiButton>
+      <UiButton icon variant="primary" :loading="dashboardLoading" :aria-label="t('actions.refresh')" @click="refreshDashboard"><RefreshCw /></UiButton>
     </PageHeader>
 
     <div class="metric-grid">

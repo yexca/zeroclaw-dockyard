@@ -1,7 +1,7 @@
 <template>
   <section class="view-stack">
     <PageHeader :title="t('resources.title')" :description="t('resources.subtitle')">
-      <UiButton variant="primary" @click="store.loadResources"><RefreshCw />{{ t("actions.refresh") }}</UiButton>
+      <UiButton icon variant="primary" :loading="refreshing" :aria-label="t('actions.refresh')" @click="refreshResources"><RefreshCw /></UiButton>
     </PageHeader>
 
     <div class="metric-grid">
@@ -55,6 +55,7 @@ const store = useManagerStore();
 const { t } = useI18n();
 const dialog = useDialog();
 const lastResult = ref(null);
+const refreshing = ref(false);
 const buckets = [
   { id: "expected", labelKey: "resources.expected" },
   { id: "conflicts", labelKey: "resources.conflicts" },
@@ -106,6 +107,17 @@ async function runAction(action, kind, row, extra = {}) {
   lastResult.value = await store.resourceAction(action, { kind, name: resourceName(row) }, extra);
 }
 
+async function refreshResources() {
+  refreshing.value = true;
+  try {
+    await store.loadResources();
+  } catch (error) {
+    store.setError(error);
+  } finally {
+    refreshing.value = false;
+  }
+}
+
 async function migrate(kind, row) {
   const target_name = await dialog.prompt(t("resources.migrateTargetPrompt"), `${resourceName(row)}-migrated`);
   if (!target_name) return;
@@ -119,5 +131,5 @@ async function deleteResource(kind, row) {
   await runAction("delete", kind, row);
 }
 
-onMounted(() => store.loadResources().catch((error) => store.setError(error)));
+onMounted(() => refreshResources());
 </script>

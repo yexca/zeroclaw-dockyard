@@ -241,6 +241,59 @@ svg {
   font-size: 13px;
 }
 
+.toolbar-menu {
+  position: relative;
+}
+
+.toolbar-menu summary {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.toolbar-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.toolbar-menu summary:hover {
+  border-color: var(--text);
+}
+
+.toolbar-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 156px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.toolbar-menu__panel button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.toolbar-menu__panel button:hover,
+.toolbar-menu__panel button.active {
+  background: var(--panel-subtle);
+}
+
 .view-stack {
   display: grid;
   gap: 16px;
@@ -333,6 +386,87 @@ svg {
   padding: 0;
 }
 
+.ui-button--loading svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 80;
+  display: grid;
+  gap: 10px;
+  width: min(380px, calc(100vw - 36px));
+}
+
+.toast-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.toast-card strong,
+.toast-card p {
+  margin: 0;
+}
+
+.toast-card p {
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.toast-card--success {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--line));
+}
+
+.toast-card--error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+
+.toast-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  transform-origin: left center;
+  animation: toast-countdown linear forwards;
+}
+
+.toast-card--success .toast-progress {
+  background: var(--success);
+}
+
+.toast-card--error .toast-progress {
+  background: var(--danger);
+}
+
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -392,6 +526,13 @@ svg {
   grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+
+.sticky-panel {
+  position: sticky;
+  top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow: auto;
 }
 
 .agent-workbench {
@@ -817,6 +958,14 @@ mark.bad {
   padding-bottom: 4px;
 }
 
+.sticky-tabs {
+  position: sticky;
+  top: 18px;
+  z-index: 12;
+  padding-top: 4px;
+  background: var(--panel);
+}
+
 .file-tabs button {
   display: inline-flex;
   align-items: center;
@@ -847,6 +996,12 @@ mark.bad {
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel-subtle);
+}
+
+.sticky-template-meta {
+  position: sticky;
+  top: 64px;
+  z-index: 11;
 }
 
 .template-file-meta strong,
@@ -1008,6 +1163,13 @@ mark.bad {
   .runtime-groups,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sticky-panel,
+  .sticky-tabs,
+  .sticky-template-meta {
+    position: static;
+    max-height: none;
   }
 }
 

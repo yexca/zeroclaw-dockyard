@@ -5,7 +5,7 @@
     </PageHeader>
 
     <div class="editor-layout">
-      <UiCard :title="t('profiles.title')" :description="t('profiles.listHelp')">
+      <UiCard class="sticky-panel" :title="t('profiles.title')" :description="t('profiles.listHelp')">
         <div class="item-list">
           <button
             v-for="profile in profiles"
@@ -128,18 +128,12 @@
           </div>
           <div class="button-row form-field--wide">
             <UiButton variant="primary" type="submit"><Save />{{ t("actions.save") }}</UiButton>
-            <UiButton v-if="kind === 'llm'" type="button" @click="testProfile"><PlugZap />{{ t("actions.testConnection") }}</UiButton>
+            <UiButton v-if="kind === 'llm'" type="button" :loading="testingProfile" @click="testProfile"><PlugZap />{{ t("actions.testConnection") }}</UiButton>
             <UiButton v-if="!draft._draft" variant="danger" @click="remove"><Trash2 />{{ t("actions.delete") }}</UiButton>
           </div>
           <p v-if="formMessage" class="field-error form-field--wide">{{ formMessage }}</p>
         </form>
         <p v-else class="empty-text">{{ t("profiles.empty") }}</p>
-      </UiCard>
-    </div>
-
-    <div v-if="testResult" class="split-panels">
-      <UiCard v-if="testResult" :title="t('profiles.testResult')">
-        <pre class="code-block">{{ JSON.stringify(testResult, null, 2) }}</pre>
       </UiCard>
     </div>
   </section>
@@ -156,6 +150,7 @@ import UiButton from "../components/UiButton.vue";
 import UiCard from "../components/UiCard.vue";
 import { useDialog } from "../composables/useDialog.js";
 import { useI18n } from "../composables/useI18n.js";
+import { useToast } from "../composables/useToast.js";
 import { clone, itemId } from "../lib/api.js";
 import {
   firstError,
@@ -173,9 +168,10 @@ const route = useRoute();
 const store = useManagerStore();
 const { t } = useI18n();
 const dialog = useDialog();
+const toast = useToast();
 const selectedId = ref("");
 const draft = ref(null);
-const testResult = ref(null);
+const testingProfile = ref(false);
 const formErrors = ref({});
 const formMessage = ref("");
 const advancedJsonError = ref("");
@@ -202,7 +198,7 @@ const description = computed(() => {
 watch(kind, () => {
   selectedId.value = "";
   draft.value = null;
-  testResult.value = null;
+  testingProfile.value = false;
 });
 
 watch(
@@ -229,7 +225,7 @@ watch(
 function selectProfile(profile) {
   selectedId.value = itemId(profile);
   draft.value = clone(profile);
-  testResult.value = null;
+  testingProfile.value = false;
   formErrors.value = {};
   formMessage.value = "";
   advancedJsonError.value = "";
@@ -238,7 +234,7 @@ function selectProfile(profile) {
 function createProfile() {
   draft.value = { ...store.newProfile(kind.value), _draft: true };
   selectedId.value = "";
-  testResult.value = null;
+  testingProfile.value = false;
   formErrors.value = {};
   formMessage.value = "";
   advancedJsonError.value = "";
@@ -403,7 +399,18 @@ const excludedTools = computed({
 async function testProfile() {
   const payload = clone(draft.value);
   delete payload._draft;
-  testResult.value = await store.testLlmProfile(payload);
+  testingProfile.value = true;
+  try {
+    const result = await store.testLlmProfile(payload);
+    const latency = result.latency_ms ?? 0;
+    const model = result.model || payload.model || "";
+    const preview = result.preview ? ` ${result.preview}` : "";
+    toast.success(`${t("profiles.testPassed")} ${model} / ${latency}ms.${preview}`);
+  } catch (error) {
+    store.setError(error);
+  } finally {
+    testingProfile.value = false;
+  }
 }
 
 function profileUsage(profileId) {

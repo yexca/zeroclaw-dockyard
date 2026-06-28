@@ -183,7 +183,8 @@
       "multiMessage": "多消息",
       "edit": "编辑",
       "disabled": "禁用"
-    }
+    },
+    "testPassed": "LLM 测试通过"
   },
   "prompts": {
     "title": "提示词模板",
@@ -771,5 +772,10 @@
     "config": "配置",
     "env": "环境",
     "result": "结果"
+  },
+  "toast": {
+    "success": "已完成",
+    "error": "需要处理",
+    "info": "通知"
   }
 }

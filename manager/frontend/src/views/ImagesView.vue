@@ -1,7 +1,7 @@
 <template>
   <section class="view-stack">
     <PageHeader :title="t('images.title')" :description="t('images.subtitle')">
-      <UiButton variant="primary" @click="store.loadImages"><RefreshCw />{{ t("actions.refresh") }}</UiButton>
+      <UiButton icon variant="primary" :loading="refreshing" :aria-label="t('actions.refresh')" @click="refreshImages"><RefreshCw /></UiButton>
     </PageHeader>
 
     <div class="button-row">
@@ -49,6 +49,7 @@ const { t } = useI18n();
 const dialog = useDialog();
 const rows = computed(() => store.images?.images || store.images?.rows || []);
 const lastResult = ref(null);
+const refreshing = ref(false);
 
 async function runImageAction(action, extra = {}) {
   lastResult.value = await store.imageAction(action, extra);
@@ -60,5 +61,16 @@ async function runBuild(action) {
   await runImageAction(action, { acknowledge_risk: true });
 }
 
-onMounted(() => store.loadImages().catch((error) => store.setError(error)));
+async function refreshImages() {
+  refreshing.value = true;
+  try {
+    await store.loadImages();
+  } catch (error) {
+    store.setError(error);
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+onMounted(() => refreshImages());
 </script>

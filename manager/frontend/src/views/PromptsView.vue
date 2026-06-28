@@ -5,7 +5,7 @@
     </PageHeader>
 
     <div class="editor-layout">
-      <UiCard :title="t('prompts.templates')">
+      <UiCard class="sticky-panel" :title="t('prompts.templates')">
         <template #actions>
           <UiButton v-if="draft" @click="duplicateTemplate"><Copy />{{ t("actions.duplicate") }}</UiButton>
         </template>
@@ -24,7 +24,7 @@
           <FormField v-model="draft.description" :label="t('fields.description')" wide />
           <div class="form-field form-field--wide">
             <span>{{ t("prompts.filesLabel") }}</span>
-            <div class="file-tabs">
+            <div class="file-tabs sticky-tabs">
               <button v-for="file in fileNames" :key="file" :class="{ active: selectedFile === file }" type="button" @click="selectedFile = file">
                 {{ file }}
                 <small>{{ fileBadge(file) }}</small>
@@ -32,7 +32,7 @@
               <button type="button" @click="addFile"><Plus />{{ t("prompts.file") }}</button>
             </div>
             <small v-if="formErrors.files" class="field-error">{{ formErrors.files }}</small>
-            <div v-if="selectedFile" class="template-file-meta">
+            <div v-if="selectedFile" class="template-file-meta sticky-template-meta">
               <strong>{{ selectedFile }}</strong>
               <span>{{ fileHelp(selectedFile) }}</span>
               <div class="button-row">

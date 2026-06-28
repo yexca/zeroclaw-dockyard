@@ -21,28 +21,27 @@
       <header class="topbar">
         <div class="status-strip">
           <span :class="['status-dot', store.error ? 'danger' : '']"></span>
-          <span>{{ store.error || store.notice || t("app.status") }}</span>
+          <span>{{ t("app.status") }}</span>
         </div>
         <div class="topbar-actions">
-          <label>
-            <span>{{ t("preferences.language") }}</span>
-            <select v-model="language">
-              <option v-for="supportedLocale in supportedLocales" :key="supportedLocale" :value="supportedLocale">
+          <details class="toolbar-menu">
+            <summary :title="t('preferences.language')" :aria-label="t('preferences.language')"><Languages /></summary>
+            <div class="toolbar-menu__panel">
+              <button v-for="supportedLocale in supportedLocales" :key="supportedLocale" :class="{ active: language === supportedLocale }" type="button" @click="language = supportedLocale">
                 {{ t(`preferences.languages.${supportedLocale}`) }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>{{ t("preferences.theme") }}</span>
-            <select v-model="themeMode" @change="applyTheme">
-              <option value="system">{{ t("preferences.themes.system") }}</option>
-              <option value="light">{{ t("preferences.themes.light") }}</option>
-              <option value="dark">{{ t("preferences.themes.dark") }}</option>
-            </select>
-          </label>
-          <UiButton variant="secondary" @click="store.loadConfig">
+              </button>
+            </div>
+          </details>
+          <details class="toolbar-menu">
+            <summary :title="t('preferences.theme')" :aria-label="t('preferences.theme')"><SunMoon /></summary>
+            <div class="toolbar-menu__panel">
+              <button v-for="mode in themeModes" :key="mode" :class="{ active: themeMode === mode }" type="button" @click="setTheme(mode)">
+                {{ t(`preferences.themes.${mode}`) }}
+              </button>
+            </div>
+          </details>
+          <UiButton icon variant="secondary" :loading="store.loading" :aria-label="t('actions.refresh')" @click="store.loadConfig">
             <RefreshCw />
-            {{ t("actions.refresh") }}
           </UiButton>
         </div>
       </header>
@@ -50,6 +49,7 @@
       <RouterView />
     </main>
     <DialogHost />
+    <ToastHost />
   </div>
 </template>
 
@@ -63,15 +63,18 @@ import {
   FileArchive,
   FileText,
   Gauge,
+  Languages,
   Network,
   Package,
   Plug,
   RefreshCw,
   Settings2,
-  Sparkles
+  Sparkles,
+  SunMoon
 } from "@lucide/vue";
 import UiButton from "./components/UiButton.vue";
 import DialogHost from "./components/DialogHost.vue";
+import ToastHost from "./components/ToastHost.vue";
 import { useI18n } from "./composables/useI18n.js";
 import { useManagerStore } from "./stores/manager.js";
 import { applyThemeMode, normalizeThemeMode } from "./theme-core.mjs";
@@ -80,6 +83,7 @@ import { loadDefaultPreferences, readPreference, STORAGE_KEYS } from "./preferen
 const store = useManagerStore();
 const { locale, supportedLocales, setLocale, t } = useI18n();
 const themeMode = ref(normalizeThemeMode(localStorage.getItem("zeroclaw.webui.theme") || "system"));
+const themeModes = ["system", "light", "dark"];
 const language = computed({
   get: () => locale.value,
   set: (value) => setLocale(value)
@@ -105,6 +109,11 @@ function applyTheme() {
     documentElement: document.documentElement,
     matchMedia: window.matchMedia.bind(window)
   });
+}
+
+function setTheme(mode) {
+  themeMode.value = normalizeThemeMode(mode);
+  applyTheme();
 }
 
 onMounted(async () => {

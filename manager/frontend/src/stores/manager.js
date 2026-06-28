@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { api, clone, itemId } from "../lib/api.js";
+import { useToast } from "../composables/useToast.js";
 
 const DEFAULT_AGENT = {
   id: "agent1",
@@ -76,9 +77,12 @@ export const useManagerStore = defineStore("manager", {
     setNotice(message) {
       this.notice = message;
       this.error = "";
+      if (message) useToast().success(message);
     },
     setError(error) {
-      this.error = error?.message || String(error);
+      const message = error?.message || String(error);
+      this.error = message;
+      if (message) useToast().error(message);
     },
     async loadConfig() {
       this.loading = true;
@@ -173,12 +177,10 @@ export const useManagerStore = defineStore("manager", {
       this.setNotice(`${kind.toUpperCase()} profile ${id} deleted.`);
     },
     async testLlmProfile(profile) {
-      const result = await api("/api/profiles/llm/test", {
+      return api("/api/profiles/llm/test", {
         method: "POST",
         body: { profile }
       });
-      this.setNotice(`LLM test passed in ${result.latency_ms ?? 0}ms.`);
-      return result;
     },
     async saveTemplate(template) {
       const id = itemId(template);
