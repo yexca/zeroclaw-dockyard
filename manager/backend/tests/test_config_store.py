@@ -887,7 +887,13 @@ class DockerControllerTest(unittest.TestCase):
 
     def test_bind_sync_does_not_create_volume(self) -> None:
         controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
-        spec = controller.build_container_spec({"docker": {"storage_driver": "bind"}}, {"id": "agent1", "host_port": 42641})
+        spec = controller.build_container_spec(
+            {
+                "paths": {"instances_dir": str(Path(self.temp_dir.name) / "instances")},
+                "docker": {"storage_driver": "bind"},
+            },
+            {"id": "agent1", "host_port": 42641},
+        )
         calls = []
         controller.ensure_volume = lambda volume_name: calls.append(volume_name)
         controller.run_sync_helper = lambda _spec, _direction: None
