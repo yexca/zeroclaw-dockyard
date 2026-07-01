@@ -112,10 +112,10 @@ class AgentRenderer:
 
         defaults = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
         matrix_defaults = defaults.get("matrix") if isinstance(defaults.get("matrix"), dict) else {}
-        resolved["model"] = deep_merge(llm, agent.get("model") if isinstance(agent.get("model"), dict) else {})
-        resolved["vision"] = deep_merge(vision, agent.get("vision") if isinstance(agent.get("vision"), dict) else {})
-        resolved["matrix"] = deep_merge(deep_merge(matrix_defaults, matrix), agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {})
-        resolved["mcp"] = deep_merge(mcp, agent.get("mcp") if isinstance(agent.get("mcp"), dict) else {})
+        resolved["model"] = deep_fill(llm, agent.get("model") if isinstance(agent.get("model"), dict) else {})
+        resolved["vision"] = deep_fill(vision, agent.get("vision") if isinstance(agent.get("vision"), dict) else {})
+        resolved["matrix"] = deep_fill(deep_fill(matrix, matrix_defaults), agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {})
+        resolved["mcp"] = deep_fill(mcp, agent.get("mcp") if isinstance(agent.get("mcp"), dict) else {})
         return resolved
 
     def render_env(self, config: dict[str, Any], agent: dict[str, Any]) -> dict[str, str]:
@@ -459,6 +459,22 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
         if isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = deep_merge(result[key], value)
         else:
+            result[key] = copy.deepcopy(value)
+    return result
+
+
+def is_empty_config_value(value: Any) -> bool:
+    return value is None or value == "" or value == [] or value == {}
+
+
+def deep_fill(primary: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(primary)
+    for key, value in fallback.items():
+        if is_empty_config_value(value):
+            continue
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = deep_fill(result[key], value)
+        elif key not in result or is_empty_config_value(result.get(key)):
             result[key] = copy.deepcopy(value)
     return result
 

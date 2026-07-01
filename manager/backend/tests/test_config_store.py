@@ -264,7 +264,7 @@ class ConfigStoreTest(unittest.TestCase):
         decisions = self.store.load_resource_decisions()
         self.assertEqual(decisions["ignored"], [])
 
-    def test_rotate_matrix_device_id_updates_agent_override(self) -> None:
+    def test_rotate_matrix_device_id_clears_agent_override(self) -> None:
         self.store.update_full_config(
             self.modular_payload({
                 "profiles": {
@@ -281,7 +281,7 @@ class ConfigStoreTest(unittest.TestCase):
                         "host_port": 42641,
                         "llm_profile": "llm",
                         "matrix_profile": "matrix",
-                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "device_id": "OLD_AGENT_DEVICE", "external_peers": ["@you:matrix.example.com"]},
                     }
                 ],
             })
@@ -290,8 +290,8 @@ class ConfigStoreTest(unittest.TestCase):
         result = self.store.rotate_matrix_device_id("agent1")
         agent = self.store.get_agent("agent1")
 
-        self.assertTrue(result["device_id"].startswith("ZEROCLAW_AGENT1_"))
-        self.assertEqual(agent["matrix"]["device_id"], result["device_id"])
+        self.assertEqual(result["device_id"], "")
+        self.assertNotIn("device_id", agent["matrix"])
         self.assertEqual(result["previous_device_id"], "")
 
     def test_apply_prompt_template_writes_workspace_files(self) -> None:
@@ -973,6 +973,15 @@ class DockerControllerTest(unittest.TestCase):
         self.assertFalse(matrix_dir.exists())
         self.assertIn("matrix_state_removed_from_local", result["actions"])
 
+    def test_matrix_reset_script_only_removes_instance_matrix_state(self) -> None:
+        controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
+
+        script = controller.matrix_reset_script("agent1")
+
+        self.assertIn("Path('/app/instances')", script)
+        self.assertIn("'.zeroclaw' / 'state' / 'matrix'", script)
+        self.assertNotIn("Path('/volume') / '.zeroclaw' / 'state' / 'matrix'", script)
+
     def test_sync_script_uses_staged_mirror_replace(self) -> None:
         controller = DockerApiController("http://docker-socket-proxy:2375", Path(self.temp_dir.name))
 
@@ -1173,7 +1182,7 @@ class AgentRendererTest(unittest.TestCase):
             "matrix_profile": "matrix-main",
             "mcp_profile": "mcp-home",
             "prompt_template": "default",
-            "matrix": {"user_id": "@agent1:matrix.example.com", "device_id": "ZEROCLAW_AGENT1"},
+            "matrix": {"user_id": "@agent1:matrix.example.com"},
         }
 
     def tearDown(self) -> None:
@@ -1192,6 +1201,22 @@ class AgentRendererTest(unittest.TestCase):
         self.assertEqual(env["MODEL_PROVIDER_EXTRA_HEADERS"], '{ "X-Test" = "yes" }')
         self.assertEqual(env["RUNTIME_MAX_HISTORY_MESSAGES"], "80")
         self.assertEqual(env["MATRIX_USER_ID"], "@agent1:matrix.example.com")
+
+    def test_profile_config_wins_over_agent_fallback_config(self) -> None:
+        config = copy_config(self.config)
+        config["profiles"]["llm"][0]["model"] = "profile-model"
+        config["profiles"]["matrix"][0]["device_id"] = "PROFILE_DEVICE"
+        config["profiles"]["matrix"][0]["external_peers"] = ["@profile:matrix.example.com"]
+        agent = copy_config(self.agent)
+        agent["model"] = {"model": "agent-model"}
+        agent["matrix"]["device_id"] = "AGENT_DEVICE"
+        agent["matrix"]["external_peers"] = ["@agent:matrix.example.com"]
+
+        env = self.renderer.render_env(config, agent)
+
+        self.assertEqual(env["MODEL_PROVIDER_MODEL"], "profile-model")
+        self.assertEqual(env["MATRIX_DEVICE_ID"], "PROFILE_DEVICE")
+        self.assertEqual(env["MATRIX_EXTERNAL_PEERS"], "@profile:matrix.example.com")
 
     def test_render_env_includes_runtime_max_history_messages_override(self) -> None:
         config = copy_config(self.config)

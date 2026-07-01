@@ -490,15 +490,18 @@ class ConfigStore:
         agent = copy.deepcopy(agents[index])
         matrix = agent.get("matrix") if isinstance(agent.get("matrix"), dict) else {}
         previous_device_id = matrix.get("device_id") if isinstance(matrix.get("device_id"), str) else ""
-        matrix["device_id"] = generate_matrix_device_id(identifier)
-        agent["matrix"] = matrix
+        matrix.pop("device_id", None)
+        if matrix:
+            agent["matrix"] = matrix
+        else:
+            agent.pop("matrix", None)
         agents[index] = agent
         config["agents"] = agents
         self.save(config)
         return {
             "agent": copy.deepcopy(agent),
             "previous_device_id": previous_device_id,
-            "device_id": matrix["device_id"],
+            "device_id": "",
         }
 
     def set_agent_status_provider(self, provider: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]] | None) -> None:
@@ -819,7 +822,16 @@ class ConfigStore:
         config["agents"] = normalize_collection(config.get("agents"))
         for agent in config["agents"]:
             agent["skill_bundles"] = self._normalize_string_list(agent.get("skill_bundles"))
+            self._strip_agent_matrix_device_id(agent)
         return config
+
+    def _strip_agent_matrix_device_id(self, agent: dict[str, Any]) -> None:
+        matrix = agent.get("matrix")
+        if not isinstance(matrix, dict):
+            return
+        matrix.pop("device_id", None)
+        if not matrix:
+            agent.pop("matrix", None)
 
     def _normalize_prompt_templates(self, templates: list[dict[str, Any]]) -> list[dict[str, Any]]:
         defaults = self._default_prompt_template_files()
@@ -966,9 +978,3 @@ def redact(value: Any) -> Any:
 def to_json(data: Any) -> str:
     return json.dumps(redact(data), sort_keys=True, ensure_ascii=True)
 
-
-def generate_matrix_device_id(identifier: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9]+", "_", str(identifier).upper()).strip("_") or "AGENT"
-    safe = safe[:32]
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"ZEROCLAW_{safe}_{stamp}"

@@ -543,9 +543,7 @@ class ManagerHandler(BaseHTTPRequestHandler):
                 return
             if method == "POST" and action == "reset-matrix-state":
                 agent = STORE.get_agent(identifier)
-                reset_result = DOCKER.reset_matrix_state(config, agent)
-                rotate_result = STORE.rotate_matrix_device_id(identifier)
-                result = {"runtime": reset_result, "config": rotate_result}
+                result = DOCKER.reset_matrix_state(config, agent)
                 HISTORY.append("reset-matrix-state", agent_id=identifier, result=result)
                 success(self, 200, result)
                 return

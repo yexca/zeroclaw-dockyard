@@ -417,7 +417,7 @@ class DockerApiController:
         actions: list[str] = []
         if spec.storage_driver == "volume":
             self.run_matrix_reset_helper(spec)
-            actions.append("matrix_state_removed_from_local_and_runtime")
+            actions.append("matrix_state_removed_from_local")
         else:
             matrix_dir = (spec.instance_dir / ".zeroclaw" / "state" / "matrix").resolve()
             instance_dir = spec.instance_dir.resolve()
@@ -1209,7 +1209,6 @@ from pathlib import Path
 
 targets = [
     Path('/app/instances') / {safe_name!r} / '.zeroclaw' / 'state' / 'matrix',
-    Path('/volume') / '.zeroclaw' / 'state' / 'matrix',
 ]
 
 for target in targets:
