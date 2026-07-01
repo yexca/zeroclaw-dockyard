@@ -220,6 +220,8 @@
     "templateId": "模板 ID",
     "file": "文件",
     "rename": "重命名",
+    "fillExample": "填充示例",
+    "fillEmptyExamples": "填充空文件示例",
     "deleteTemplate": "删除模板",
     "fileCount": "{count} 个文件",
     "emptyList": "还没有模板。",

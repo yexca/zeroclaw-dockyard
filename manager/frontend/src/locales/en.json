@@ -276,6 +276,8 @@
     "templateId": "Template ID",
     "file": "File",
     "rename": "Rename",
+    "fillExample": "Fill example",
+    "fillEmptyExamples": "Fill empty examples",
     "deleteTemplate": "Delete template",
     "fileCount": "{count} files",
     "emptyList": "No templates yet.",

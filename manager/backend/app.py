@@ -274,6 +274,10 @@ class ManagerHandler(BaseHTTPRequestHandler):
             success(self, 200, AI_FILLER.fill(STORE.load(), self.read_json()))
             return
 
+        if path == "/api/prompt-templates/examples" and method == "GET":
+            success(self, 200, {"files": STORE.prompt_template_examples()})
+            return
+
         if len(segments) >= 3 and segments[:2] == ["api", "profiles"]:
             if segments[2:] == ["llm", "test"] and method == "POST":
                 payload = self.read_json()

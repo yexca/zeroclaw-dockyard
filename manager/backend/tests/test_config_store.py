@@ -151,9 +151,16 @@ class ConfigStoreTest(unittest.TestCase):
         self.assertIn("SOUL.md", template["files"])
         self.assertIn("HEARTBEAT.md", template["files"])
         self.assertIn("PROACTIVE.md", template["files"])
-        self.assertIn("Personal Assistant", template["files"]["AGENTS.md"])
-        self.assertIn("Keep this file empty", template["files"]["HEARTBEAT.md"])
-        self.assertIn("optional proactive service", template["files"]["PROACTIVE.md"])
+        self.assertEqual(template["files"]["AGENTS.md"], "")
+        self.assertEqual(template["files"]["HEARTBEAT.md"], "")
+        self.assertEqual(template["files"]["PROACTIVE.md"], "")
+
+    def test_load_preserves_empty_prompt_template_files(self) -> None:
+        config = self.store.load()
+        template = config["prompt_templates"][0]
+
+        self.assertEqual(template["files"]["AGENTS.md"], "")
+        self.assertIn("SOUL.md", template["files"])
 
     def test_profile_crud_is_persisted(self) -> None:
         created = self.store.create_item("llm", {"id": "local", "model": "qwen"})
@@ -316,12 +323,43 @@ class ConfigStoreTest(unittest.TestCase):
         result = self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
 
         self.assertIn("AGENTS.md", result["written"])
-        self.assertIn("SOUL.md", result["written"])
-        self.assertIn("HEARTBEAT.md", result["written"])
+        self.assertIn("SOUL.md", result["skipped_empty"])
+        self.assertIn("HEARTBEAT.md", result["skipped_empty"])
         self.assertEqual(
             (Path(self.temp_dir.name) / "instances" / "agent1" / "workspace" / "AGENTS.md").read_text(encoding="utf-8"),
             "hello",
         )
+
+    def test_apply_prompt_template_skips_empty_files_without_deleting_existing_workspace_files(self) -> None:
+        self.store.update_full_config(
+            self.modular_payload({
+                "prompt_templates": [{"id": "default", "files": {"AGENTS.md": ""}}],
+                "profiles": {
+                    "llm": [{"id": "llm", "provider_family": "ollama", "provider_alias": "local", "model": "qwen"}],
+                    "matrix": [{"id": "matrix", "homeserver": "https://matrix.example.com", "access_token": "token"}],
+                    "mcp": [],
+                },
+                "agents": [
+                    {
+                        "id": "agent1",
+                        "host_port": 42641,
+                        "llm_profile": "llm",
+                        "matrix_profile": "matrix",
+                        "prompt_template": "default",
+                        "matrix": {"user_id": "@agent1:matrix.example.com", "external_peers": ["@you:matrix.example.com"]},
+                    }
+                ],
+            })
+        )
+        workspace = Path(self.temp_dir.name) / "instances" / "agent1" / "workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        (workspace / "AGENTS.md").write_text("keep me", encoding="utf-8")
+
+        result = self.store.apply_prompt_template("agent1", {"mode": "overwrite"})
+
+        self.assertIn("AGENTS.md", result["skipped_empty"])
+        self.assertNotIn("AGENTS.md", result["written"])
+        self.assertEqual((workspace / "AGENTS.md").read_text(encoding="utf-8"), "keep me")
 
     def test_publish_agent_saves_applies_template_and_syncs_runtime(self) -> None:
         self.store.update_full_config(

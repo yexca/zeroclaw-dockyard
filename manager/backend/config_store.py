@@ -830,11 +830,14 @@ class ConfigStore:
             if not isinstance(files, dict):
                 files = {}
             normalized_files = {str(key): str(value) for key, value in files.items()}
-            for filename, content in defaults.items():
-                if not normalized_files.get(filename):
-                    normalized_files[filename] = content
+            for filename in defaults:
+                if filename not in normalized_files:
+                    normalized_files[filename] = ""
             template["files"] = normalized_files
         return templates
+
+    def prompt_template_examples(self) -> dict[str, str]:
+        return self._default_prompt_template_files()
 
     def _normalize_skill_bundles(self, value: Any) -> list[dict[str, Any]]:
         bundles = normalize_collection(value)

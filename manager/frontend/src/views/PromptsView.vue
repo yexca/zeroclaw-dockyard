@@ -4,10 +4,10 @@
       <UiButton variant="primary" @click="createTemplate"><Plus />{{ t("prompts.newTemplate") }}</UiButton>
     </PageHeader>
 
-    <div class="editor-layout">
-      <UiCard class="sticky-panel" :title="t('prompts.templates')">
+    <div class="editor-layout prompts-layout">
+      <UiCard class="sticky-panel prompts-template-list-panel" :title="t('prompts.templates')">
         <template #actions>
-          <UiButton v-if="draft" @click="duplicateTemplate"><Copy />{{ t("actions.duplicate") }}</UiButton>
+          <UiButton v-if="draft" icon :tooltip="t('actions.duplicate')" aria-label="Duplicate template" @click="duplicateTemplate"><Copy /></UiButton>
         </template>
         <div class="item-list">
           <button v-for="template in store.templates" :key="itemId(template)" :class="{ active: selectedId === itemId(template) }" @click="selectTemplate(template)">
@@ -19,39 +19,52 @@
       </UiCard>
 
       <UiCard :title="t('prompts.details')" :description="t('prompts.detailsHelp')">
-        <form v-if="draft" class="form-grid" @submit.prevent="save">
-          <FormField v-model="draft.id" :label="t('prompts.templateId')" :error="formErrors.id" required />
-          <FormField v-model="draft.description" :label="t('fields.description')" wide />
+        <form v-if="draft" class="prompt-template-form" @submit.prevent="save">
+          <div class="prompt-template-meta">
+            <FormField v-model="draft.id" :label="t('prompts.templateId')" :error="formErrors.id" required />
+            <FormField v-model="draft.description" :label="t('fields.description')" />
+          </div>
           <div class="form-field form-field--wide">
             <span>{{ t("prompts.filesLabel") }}</span>
-            <div class="file-tabs sticky-tabs">
-              <button v-for="file in fileNames" :key="file" :class="{ active: selectedFile === file }" type="button" @click="selectedFile = file">
-                {{ file }}
-                <small>{{ fileBadge(file) }}</small>
-              </button>
-              <button type="button" @click="addFile"><Plus />{{ t("prompts.file") }}</button>
-            </div>
             <small v-if="formErrors.files" class="field-error">{{ formErrors.files }}</small>
-            <div v-if="selectedFile" class="template-file-meta sticky-template-meta">
-              <strong>{{ selectedFile }}</strong>
-              <span>{{ fileHelp(selectedFile) }}</span>
-              <div class="button-row">
-                <UiButton type="button" @click="renameFile"><Pencil />{{ t("prompts.rename") }}</UiButton>
-                <UiButton type="button" variant="danger" :disabled="protectedFile(selectedFile)" @click="deleteFile"><Trash2 />{{ t("actions.delete") }}</UiButton>
+            <div class="prompt-file-workbench">
+              <nav class="prompt-file-list" :aria-label="t('prompts.filesLabel')">
+                <button v-for="file in fileNames" :key="file" :class="{ active: selectedFile === file, empty: fileEmpty(file) }" type="button" @click="selectedFile = file">
+                  <span>{{ displayFileName(file) }}</span>
+                  <small v-if="fileBadge(file)">{{ fileBadge(file) }}</small>
+                  <small v-else-if="fileEmpty(file)" class="prompt-file-empty">{{ t("common.empty") }}</small>
+                </button>
+                <button type="button" class="prompt-file-add" @click="addFile"><Plus />{{ t("prompts.file") }}</button>
+              </nav>
+              <div class="prompt-editor-panel">
+                <div v-if="selectedFile" class="template-editor-status">
+                  <strong>{{ selectedFile }}</strong>
+                  <span>{{ selectedFileStats }}</span>
+                </div>
+                <textarea v-if="selectedFile" v-model="draft.files[selectedFile]" class="template-editor-text" spellcheck="false" />
               </div>
+              <aside v-if="selectedFile" class="prompt-actions-panel">
+                <div class="template-file-meta">
+                  <strong>{{ displayFileName(selectedFile) }}</strong>
+                  <span>{{ fileHelp(selectedFile) }}</span>
+                </div>
+                <div class="prompt-actions-stack">
+                  <UiButton variant="primary" type="submit" :tooltip="t('actions.save')" aria-label="Save"><Save /></UiButton>
+                  <UiButton type="button" :tooltip="t('actions.aiFill')" aria-label="AI fill" @click="aiFillOpen = !aiFillOpen"><Sparkles /></UiButton>
+                  <UiButton type="button" :tooltip="t('prompts.fillExample')" aria-label="Fill example" @click="fillExample(selectedFile)"><FilePlus2 /></UiButton>
+                  <UiButton type="button" :tooltip="t('prompts.fillEmptyExamples')" aria-label="Fill empty examples" @click="fillEmptyExamples"><Files /></UiButton>
+                  <UiButton type="button" :disabled="protectedFile(selectedFile)" :tooltip="t('prompts.rename')" aria-label="Rename" @click="renameFile"><Pencil /></UiButton>
+                  <UiButton type="button" variant="danger" :disabled="protectedFile(selectedFile)" :tooltip="t('actions.delete')" aria-label="Delete file" @click="deleteFile"><Trash2 /></UiButton>
+                  <UiButton v-if="!draft._draft" type="button" variant="danger" :tooltip="t('prompts.deleteTemplate')" aria-label="Delete template" @click="deleteTemplate"><Trash2 /></UiButton>
+                </div>
+              </aside>
             </div>
-            <textarea v-if="selectedFile" v-model="draft.files[selectedFile]" class="template-editor-text" spellcheck="false" />
           </div>
           <div class="form-field form-field--wide">
             <details class="advanced-disclosure">
               <summary>{{ t("profiles.advancedJson") }}</summary>
               <JsonEditor v-model="draft" />
             </details>
-          </div>
-          <div class="button-row form-field--wide">
-            <UiButton variant="primary" type="submit"><Save />{{ t("actions.save") }}</UiButton>
-            <UiButton type="button" @click="aiFillOpen = !aiFillOpen"><Sparkles />{{ t("actions.aiFill") }}</UiButton>
-            <UiButton v-if="!draft._draft" type="button" variant="danger" @click="deleteTemplate"><Trash2 />{{ t("prompts.deleteTemplate") }}</UiButton>
           </div>
           <p v-if="formMessage" class="field-error form-field--wide">{{ formMessage }}</p>
         </form>
@@ -93,7 +106,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Copy, Pencil, Plus, Save, Sparkles, Trash2 } from "@lucide/vue";
+import { Copy, FilePlus2, Files, Pencil, Plus, Save, Sparkles, Trash2 } from "@lucide/vue";
 import FormField from "../components/FormField.vue";
 import JsonEditor from "../components/JsonEditor.vue";
 import PageHeader from "../components/PageHeader.vue";
@@ -110,11 +123,13 @@ const { t } = useI18n();
 const dialog = useDialog();
 const PROMPT_SYSTEM_FILES = ["AGENTS.md", "SOUL.md", "TOOLS.md", "IDENTITY.md", "USER.md", "MEMORY.md"];
 const TEMPLATE_FILES = [...PROMPT_SYSTEM_FILES, "HEARTBEAT.md", "PROACTIVE.md"];
+const EMPTY_TEMPLATE_FILES = Object.fromEntries(TEMPLATE_FILES.map((file) => [file, ""]));
 const selectedId = ref("");
 const draft = ref(null);
 const selectedFile = ref("");
 const formErrors = ref({});
 const formMessage = ref("");
+const exampleFiles = ref({});
 const aiFillOpen = ref(false);
 const aiFill = ref({
   llm_profile: "",
@@ -126,6 +141,11 @@ const aiFill = ref({
 
 const fileNames = computed(() => Object.keys(draft.value?.files || {}));
 const llmOptions = computed(() => store.profiles.llm.map((profile) => ({ label: itemId(profile), value: itemId(profile) })));
+const selectedFileStats = computed(() => {
+  const content = draft.value?.files?.[selectedFile.value] || "";
+  if (!content.trim()) return t("common.empty");
+  return `${content.length} chars`;
+});
 
 watch(
   () => store.templates,
@@ -138,6 +158,7 @@ watch(
 function selectTemplate(template) {
   selectedId.value = itemId(template);
   draft.value = clone(template);
+  ensureTemplateFiles(draft.value);
   selectedFile.value = Object.keys(draft.value.files || {})[0] || "";
   formErrors.value = {};
   formMessage.value = "";
@@ -146,7 +167,7 @@ function selectTemplate(template) {
 
 function createTemplate() {
   const next = store.templates.length + 1;
-  draft.value = { id: `template-${next}`, description: "", files: { "AGENTS.md": "" }, _draft: true };
+  draft.value = { id: `template-${next}`, description: "", files: { ...EMPTY_TEMPLATE_FILES }, _draft: true };
   selectedId.value = "";
   selectedFile.value = "AGENTS.md";
   formErrors.value = {};
@@ -159,6 +180,7 @@ function duplicateTemplate() {
   const copy = clone(draft.value);
   copy.id = nextTemplateId(`${itemId(copy)}-copy`);
   copy._draft = true;
+  ensureTemplateFiles(copy);
   selectedId.value = "";
   draft.value = copy;
   selectedFile.value = Object.keys(copy.files || {})[0] || "";
@@ -169,6 +191,7 @@ async function save() {
   if (!validateTemplateForm()) return;
   const payload = clone(draft.value);
   payload.files = payload.files || {};
+  ensureTemplateFiles(payload);
   delete payload._draft;
   await store.saveTemplate(payload);
   selectedId.value = payload.id;
@@ -235,6 +258,29 @@ function resetAiFill() {
   };
 }
 
+async function loadExampleFiles() {
+  if (Object.keys(exampleFiles.value).length) return exampleFiles.value;
+  const result = await store.promptTemplateExamples();
+  exampleFiles.value = result.files || {};
+  return exampleFiles.value;
+}
+
+async function fillExample(file) {
+  if (!file || !draft.value?.files) return;
+  const examples = await loadExampleFiles();
+  draft.value.files[file] = examples[file] || "";
+}
+
+async function fillEmptyExamples() {
+  if (!draft.value?.files) return;
+  const examples = await loadExampleFiles();
+  for (const file of TEMPLATE_FILES) {
+    if (file in draft.value.files && !String(draft.value.files[file] || "").trim()) {
+      draft.value.files[file] = examples[file] || "";
+    }
+  }
+}
+
 async function runAiFill() {
   const currentFiles = Object.fromEntries(
     [...new Set([...aiFill.value.files, ...aiFill.value.reference_files])].map((file) => [file, draft.value.files?.[file] || ""])
@@ -259,10 +305,8 @@ function protectedFile(file) {
 
 function fileBadge(file) {
   const index = PROMPT_SYSTEM_FILES.indexOf(file);
-  if (index >= 0) return t("prompts.readOrder", { n: index + 1 });
-  if (file === "HEARTBEAT.md") return t("prompts.heartbeatOnly");
-  if (file === "PROACTIVE.md") return t("prompts.optionalServiceFile");
-  return t("prompts.customFile");
+  if (index >= 0) return `#${index + 1}`;
+  return "";
 }
 
 function fileHelp(file) {
@@ -283,6 +327,21 @@ function validateFilename(value) {
   formErrors.value = { ...formErrors.value, files: "" };
   formMessage.value = firstError(formErrors.value) ? t("validation.fixFields") : "";
   return filename;
+}
+
+function ensureTemplateFiles(template) {
+  if (!template.files || typeof template.files !== "object") template.files = {};
+  for (const file of TEMPLATE_FILES) {
+    if (!(file in template.files)) template.files[file] = "";
+  }
+}
+
+function displayFileName(file) {
+  return String(file || "").replace(/\.md$/i, "");
+}
+
+function fileEmpty(file) {
+  return !String(draft.value?.files?.[file] || "").trim();
 }
 
 function validateTemplateForm() {

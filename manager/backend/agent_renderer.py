@@ -264,11 +264,15 @@ class AgentRenderer:
 
         written: list[str] = []
         skipped: list[str] = []
+        skipped_empty: list[str] = []
         merged: list[str] = []
         conflicts: list[str] = []
         for filename, content in files.items():
             if not is_safe_workspace_file(filename):
                 skipped.append(filename)
+                continue
+            if not content.strip():
+                skipped_empty.append(filename)
                 continue
             target = workspace_dir / filename
             if target.exists():
@@ -295,6 +299,7 @@ class AgentRenderer:
             "written": written,
             "merged": merged,
             "skipped": skipped,
+            "skipped_empty": skipped_empty,
             "conflicts": conflicts,
         }
 

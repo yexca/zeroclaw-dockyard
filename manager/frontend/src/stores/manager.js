@@ -201,6 +201,9 @@ export const useManagerStore = defineStore("manager", {
       this.setNotice("AI fill completed.");
       return result;
     },
+    async promptTemplateExamples() {
+      return api("/api/prompt-templates/examples");
+    },
     async saveSkillBundle(bundle) {
       const id = itemId(bundle);
       const exists = this.skillBundles.some((item) => itemId(item) === id);
