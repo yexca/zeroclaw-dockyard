@@ -141,6 +141,9 @@
     "noConfigPreview": "No config preview loaded.",
     "noEnvPreview": "No env preview loaded.",
     "noActionResult": "No action result loaded.",
+    "operationTitle": "{action} {id}",
+    "operationPending": "Waiting for Docker and workspace sync to finish. Keep this window open until the operation returns.",
+    "operationSuccess": "Operation completed. Review the result below if needed.",
     "storage": {
       "volume": "Volume",
       "bind": "Bind"

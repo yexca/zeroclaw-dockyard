@@ -518,6 +518,84 @@ svg {
   justify-content: end;
 }
 
+.runtime-operation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(0 0 0 / 0.48);
+}
+
+.runtime-operation-panel {
+  display: grid;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.runtime-operation-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.runtime-operation-header h2,
+.runtime-operation-header p {
+  margin: 0;
+}
+
+.runtime-operation-header p {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.runtime-operation-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--panel-subtle);
+  color: var(--accent);
+}
+
+.runtime-operation-icon--pending svg {
+  animation: spin 0.85s linear infinite;
+}
+
+.runtime-operation-icon--success {
+  color: var(--success);
+}
+
+.runtime-operation-icon--error {
+  color: var(--danger);
+}
+
+.runtime-operation-details {
+  max-height: 420px;
+  overflow: auto;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-subtle);
+  color: var(--text);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .editor-layout {
   display: grid;
   grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);

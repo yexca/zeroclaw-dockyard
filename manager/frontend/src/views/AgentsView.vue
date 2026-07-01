@@ -61,9 +61,9 @@
           </details>
           <div class="button-row form-field--wide">
             <UiButton variant="primary" type="submit"><Save />{{ t("actions.save") }}</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('start')"><Play />{{ t("actions.start") }}</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('stop')"><Square />{{ t("actions.stop") }}</UiButton>
-            <UiButton v-if="!draft._draft" @click="control('restart')"><RotateCw />{{ t("actions.restart") }}</UiButton>
+            <UiButton v-if="!draft._draft" :disabled="runtimeOperationPending" @click="control('start')"><Play />{{ t("actions.start") }}</UiButton>
+            <UiButton v-if="!draft._draft" :disabled="runtimeOperationPending" @click="control('stop')"><Square />{{ t("actions.stop") }}</UiButton>
+            <UiButton v-if="!draft._draft" :disabled="runtimeOperationPending" @click="control('restart')"><RotateCw />{{ t("actions.restart") }}</UiButton>
             <UiButton v-if="!draft._draft" variant="danger" @click="resetMatrix"><RefreshCcw />{{ t("actions.resetMatrixState") }}</UiButton>
             <UiButton v-if="!draft._draft" variant="danger" @click="remove"><Trash2 />{{ t("actions.delete") }}</UiButton>
           </div>
@@ -75,14 +75,14 @@
       <UiCard :title="t('agents.runtime')" :description="t('agents.runtimeHelp')">
         <template v-if="draft && !draft._draft">
           <div class="runtime-actions">
-            <UiButton @click="loadStatus"><Activity />{{ t("runtimeTabs.status") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="loadStatus"><Activity />{{ t("runtimeTabs.status") }}</UiButton>
             <label class="inline-select">
               <span>{{ t("dashboard.tail") }}</span>
               <input v-model.number="logTail" type="number" min="1" max="2000" />
             </label>
-            <UiButton @click="loadLogs"><ScrollText />{{ t("runtimeTabs.logs") }}</UiButton>
-            <UiButton @click="loadPreview"><FileCode2 />{{ t("runtimeTabs.config") }}</UiButton>
-            <UiButton @click="loadEnv"><Braces />{{ t("runtimeTabs.env") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="loadLogs"><ScrollText />{{ t("runtimeTabs.logs") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="loadPreview"><FileCode2 />{{ t("runtimeTabs.config") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="loadEnv"><Braces />{{ t("runtimeTabs.env") }}</UiButton>
             <UiButton @click="downloadLogs"><Download />{{ t("actions.downloadLogs") }}</UiButton>
           </div>
           <div class="runtime-actions">
@@ -92,10 +92,10 @@
                 <option v-for="option in templateModeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
             </label>
-            <UiButton @click="applyTemplate"><FileCheck2 />{{ t("actions.applyTemplate") }}</UiButton>
-            <UiButton @click="runAgentAction('publish')"><Upload />{{ t("actions.publish") }}</UiButton>
-            <UiButton @click="runAgentAction('sync-to-runtime')"><ArrowUpFromLine />{{ t("actions.syncToRuntime") }}</UiButton>
-            <UiButton @click="runAgentAction('sync-from-runtime')"><ArrowDownToLine />{{ t("actions.syncFromRuntime") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="applyTemplate"><FileCheck2 />{{ t("actions.applyTemplate") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="runAgentAction('publish')"><Upload />{{ t("actions.publish") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="runAgentAction('sync-to-runtime')"><ArrowUpFromLine />{{ t("actions.syncToRuntime") }}</UiButton>
+            <UiButton :disabled="runtimeOperationPending" @click="runAgentAction('sync-from-runtime')"><ArrowDownToLine />{{ t("actions.syncFromRuntime") }}</UiButton>
           </div>
           <div class="segment-tabs">
             <button v-for="tab in runtimeTabs" :key="tab" :class="{ active: runtimeTab === tab }" @click="runtimeTab = tab">{{ t(`runtimeTabs.${tab}`) }}</button>
@@ -114,6 +114,32 @@
         <p v-else class="empty-text">{{ t("agents.saveBeforeRuntime") }}</p>
       </UiCard>
     </div>
+
+    <div v-if="runtimeOperation.open" class="runtime-operation-overlay" role="presentation">
+      <section
+        class="runtime-operation-panel"
+        role="dialog"
+        aria-modal="true"
+        :aria-busy="runtimeOperationPending ? 'true' : 'false'"
+        :aria-labelledby="runtimeOperationTitleId"
+      >
+        <header class="runtime-operation-header">
+          <span :class="['runtime-operation-icon', `runtime-operation-icon--${runtimeOperation.state}`]">
+            <LoaderCircle v-if="runtimeOperationPending" />
+            <CheckCircle2 v-else-if="runtimeOperation.state === 'success'" />
+            <CircleAlert v-else />
+          </span>
+          <div>
+            <h2 :id="runtimeOperationTitleId">{{ runtimeOperation.title }}</h2>
+            <p>{{ runtimeOperation.message }}</p>
+          </div>
+        </header>
+        <pre v-if="runtimeOperation.details" class="runtime-operation-details">{{ runtimeOperation.details }}</pre>
+        <footer v-if="!runtimeOperationPending" class="dialog-actions">
+          <UiButton variant="primary" @click="closeRuntimeOperation">{{ t("actions.close") }}</UiButton>
+        </footer>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -125,9 +151,12 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Braces,
+  CheckCircle2,
+  CircleAlert,
   Download,
   FileCheck2,
   FileCode2,
+  LoaderCircle,
   Plus,
   Play,
   RefreshCcw,
@@ -163,6 +192,13 @@ const runtimeLogs = ref(null);
 const runtimeConfig = ref(null);
 const runtimeEnv = ref(null);
 const runtimeResult = ref(null);
+const runtimeOperation = ref({
+  open: false,
+  state: "idle",
+  title: "",
+  message: "",
+  details: ""
+});
 const formErrors = ref({});
 const formMessage = ref("");
 const applyTemplateMode = ref("keep");
@@ -180,6 +216,20 @@ const storageOptions = [
   { label: t("agents.storage.volume"), value: "volume" },
   { label: t("agents.storage.bind"), value: "bind" }
 ];
+const runtimeOperationTitleId = "runtime-operation-title";
+const runtimeOperationPending = computed(() => runtimeOperation.value.open && runtimeOperation.value.state === "pending");
+const runtimeActionLabels = computed(() => ({
+  "apply-template": t("actions.applyTemplate"),
+  publish: t("actions.publish"),
+  "sync-to-runtime": t("actions.syncToRuntime"),
+  "sync-from-runtime": t("actions.syncFromRuntime"),
+  "reset-matrix-state": t("actions.resetMatrixState")
+}));
+const controlOperationLabels = computed(() => ({
+  start: t("actions.start"),
+  stop: t("actions.stop"),
+  restart: t("actions.restart")
+}));
 
 const imageOptions = computed(() => {
   const recommended = store.images?.recommended || {
@@ -488,21 +538,30 @@ async function loadEnv() {
 }
 
 async function runAgentAction(action) {
-  runtimeResult.value = await store.agentAction(draft.value.id, action);
-  runtimeTab.value = "result";
-  await loadStatus();
+  await runRuntimeOperation(runtimeActionLabels.value[action] || action, async () => {
+    runtimeResult.value = await store.agentAction(draft.value.id, action);
+    runtimeTab.value = "result";
+    await loadStatus();
+    return runtimeResult.value;
+  });
 }
 
 async function applyTemplate() {
-  runtimeResult.value = await store.agentAction(draft.value.id, "apply-template", { mode: applyTemplateMode.value });
-  runtimeTab.value = "result";
-  await loadStatus();
+  await runRuntimeOperation(t("actions.applyTemplate"), async () => {
+    runtimeResult.value = await store.agentAction(draft.value.id, "apply-template", { mode: applyTemplateMode.value });
+    runtimeTab.value = "result";
+    await loadStatus();
+    return runtimeResult.value;
+  });
 }
 
 async function control(operation) {
-  await store.controlAgent(draft.value.id, operation);
-  await loadStatus();
-  if (operation !== "stop") await loadLogs();
+  await runRuntimeOperation(controlOperationLabels.value[operation] || operation, async () => {
+    const result = await store.controlAgent(draft.value.id, operation);
+    await loadStatus();
+    if (operation !== "stop") await loadLogs();
+    return result || runtimeStatus.value;
+  });
 }
 
 function downloadLogs() {
@@ -512,6 +571,44 @@ function downloadLogs() {
 async function resetMatrix() {
   if (!(await dialog.confirm(t("confirm.resetMatrixStateNamed", { id: draft.value.id })))) return;
   await runAgentAction("reset-matrix-state");
+}
+
+async function runRuntimeOperation(label, task) {
+  const agentId = draft.value?.id || selectedId.value || "";
+  runtimeOperation.value = {
+    open: true,
+    state: "pending",
+    title: t("agents.operationTitle", { action: label, id: agentId }),
+    message: t("agents.operationPending"),
+    details: ""
+  };
+  try {
+    const result = await task();
+    runtimeOperation.value = {
+      open: true,
+      state: "success",
+      title: t("agents.operationTitle", { action: label, id: agentId }),
+      message: t("agents.operationSuccess"),
+      details: result ? formatRuntime(result, "") : ""
+    };
+    return result;
+  } catch (error) {
+    const details = error?.details ? JSON.stringify(error.details, null, 2) : "";
+    runtimeOperation.value = {
+      open: true,
+      state: "error",
+      title: t("agents.operationTitle", { action: label, id: agentId }),
+      message: error?.message || String(error),
+      details
+    };
+    store.setError(error);
+    return null;
+  }
+}
+
+function closeRuntimeOperation() {
+  if (runtimeOperationPending.value) return;
+  runtimeOperation.value.open = false;
 }
 
 onMounted(() => {

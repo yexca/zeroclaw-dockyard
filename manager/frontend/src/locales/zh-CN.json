@@ -141,6 +141,9 @@
     "noConfigPreview": "尚未加载配置预览。",
     "noEnvPreview": "尚未加载环境预览。",
     "noActionResult": "尚未加载操作结果。",
+    "operationTitle": "{action} {id}",
+    "operationPending": "正在等待 Docker 操作和工作区同步完成。操作返回前请保持此窗口打开。",
+    "operationSuccess": "操作已完成。需要的话可以在下方查看返回结果。",
     "storage": {
       "volume": "卷",
       "bind": "绑定挂载"
